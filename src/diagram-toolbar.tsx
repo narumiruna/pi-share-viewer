@@ -61,7 +61,6 @@ function Control({ action, icon: Icon, label, onAction }: ControlProps) {
           sideOffset={7}
         >
           {label}
-          <Tooltip.Arrow className="pi-mermaid-tooltip-arrow" />
         </Tooltip.Content>
       </Tooltip.Portal>
     </Tooltip.Root>
@@ -130,7 +129,6 @@ function DiagramToolbar({ fullscreenTarget, onAction }: DiagramToolbarProps) {
           label="Reset view"
           onAction={onAction}
         />
-        <Toolbar.Separator className="pi-mermaid-toolbar-separator" />
         <Tooltip.Root>
           <Tooltip.Trigger asChild>
             <Toggle.Root
@@ -148,11 +146,9 @@ function DiagramToolbar({ fullscreenTarget, onAction }: DiagramToolbarProps) {
               sideOffset={7}
             >
               Trace edges
-              <Tooltip.Arrow className="pi-mermaid-tooltip-arrow" />
             </Tooltip.Content>
           </Tooltip.Portal>
         </Tooltip.Root>
-        <Toolbar.Separator className="pi-mermaid-toolbar-separator" />
         <Tooltip.Root>
           <Tooltip.Trigger asChild>
             <Toolbar.Button
@@ -170,7 +166,6 @@ function DiagramToolbar({ fullscreenTarget, onAction }: DiagramToolbarProps) {
               sideOffset={7}
             >
               {sourceVisible ? "Show diagram" : "Show source"}
-              <Tooltip.Arrow className="pi-mermaid-tooltip-arrow" />
             </Tooltip.Content>
           </Tooltip.Portal>
         </Tooltip.Root>
@@ -191,7 +186,6 @@ function DiagramToolbar({ fullscreenTarget, onAction }: DiagramToolbarProps) {
               sideOffset={7}
             >
               {copied ? "Copied" : "Copy source"}
-              <Tooltip.Arrow className="pi-mermaid-tooltip-arrow" />
             </Tooltip.Content>
           </Tooltip.Portal>
         </Tooltip.Root>
@@ -212,7 +206,6 @@ function DiagramToolbar({ fullscreenTarget, onAction }: DiagramToolbarProps) {
               sideOffset={7}
             >
               {expanded ? "Close fullscreen" : "Open fullscreen"}
-              <Tooltip.Arrow className="pi-mermaid-tooltip-arrow" />
             </Tooltip.Content>
           </Tooltip.Portal>
         </Tooltip.Root>

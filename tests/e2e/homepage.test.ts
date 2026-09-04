@@ -12,28 +12,28 @@ for (const viewport of viewports) {
     await page.setViewportSize(viewport);
     await page.goto("/");
 
-    await expect(page).toHaveTitle("Pi Share Viewer · Better shared sessions");
+    await expect(page).toHaveTitle("Pi Share Viewer");
     await expect(
       page.getByRole("heading", {
         level: 1,
-        name: "Make every shared session easier to follow.",
+        name: "Share Pi sessions.",
       }),
     ).toBeVisible();
     await expect(
-      page.getByRole("img", {
-        name: "Preview of a polished shared Pi session",
-      }),
+      page.getByRole("img", { name: "Pi session preview" }),
     ).toBeVisible();
-    await expect(
-      page.getByRole("link", { name: "Connect Pi" }),
-    ).toHaveAttribute("href", "#setup");
-    await expect(
-      page.getByRole("link", { name: "See what changes" }),
-    ).toHaveAttribute("href", "#features");
+    await expect(page.getByRole("link", { name: "Setup" })).toHaveAttribute(
+      "href",
+      "#setup",
+    );
+    await expect(page.getByRole("link", { name: "Features" })).toHaveAttribute(
+      "href",
+      "#features",
+    );
     await expect(
       page.getByRole("heading", {
         level: 2,
-        name: "Use Pi’s existing share flow.",
+        name: "Setup",
       }),
     ).toBeVisible();
     await expect(page.getByText("PI_SHARE_VIEWER_URL")).toContainText(
@@ -43,7 +43,7 @@ for (const viewport of viewports) {
       "127.0.0.1:4173/session/",
     );
     await expect(
-      page.getByText("GitHub secret Gists are unlisted", { exact: false }),
+      page.getByText("Secret Gists are unlisted, not private."),
     ).toBeVisible();
 
     const hasHorizontalOverflow = await page.evaluate(
@@ -52,12 +52,5 @@ for (const viewport of viewports) {
         document.documentElement.clientWidth,
     );
     expect(hasHorizontalOverflow).toBe(false);
-
-    const responsiveStatusDetail = page.locator(".nav-detail");
-    if (viewport.name === "mobile") {
-      await expect(responsiveStatusDetail).toBeHidden();
-    } else {
-      await expect(responsiveStatusDetail).toBeVisible();
-    }
   });
 }

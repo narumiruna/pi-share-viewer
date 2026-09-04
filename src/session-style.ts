@@ -91,10 +91,7 @@ const SESSION_STYLE = `
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 14px;
   line-height: 1.65;
-  letter-spacing: -.005em;
-  background:
-    radial-gradient(circle at 56% -10%, rgb(45 212 191 / 7%), transparent 34rem),
-    var(--body-bg);
+  background: var(--body-bg);
 }
 [data-pi-session-ui="radix"] :is(code, pre, .tree-container, .tool-output) {
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
@@ -112,15 +109,13 @@ const SESSION_STYLE = `
 }
 [data-pi-session-ui="radix"] #sidebar {
   border-right: 1px solid var(--borderMuted);
-  background: color-mix(in srgb, var(--container-bg) 94%, transparent);
-  box-shadow: 12px 0 40px rgb(0 0 0 / 12%);
+  background: var(--container-bg);
 }
 [data-pi-session-ui="radix"] .sidebar-header {
   z-index: 2;
-  padding: 14px;
+  padding: 12px;
   border-bottom: 1px solid var(--borderMuted);
-  background: color-mix(in srgb, var(--container-bg) 90%, transparent);
-  backdrop-filter: blur(18px);
+  background: var(--container-bg);
 }
 [data-pi-session-ui="radix"] .sidebar-controls,
 [data-pi-session-ui="radix"] .sidebar-filters {
@@ -131,68 +126,39 @@ const SESSION_STYLE = `
   gap: 6px;
 }
 [data-pi-session-ui="radix"] .sidebar-search {
-  height: 38px;
-  padding: 0 12px 0 34px;
+  height: 36px;
+  padding: 0 10px;
   border: 1px solid var(--borderMuted);
-  border-radius: 10px;
-  background:
-    linear-gradient(90deg, transparent 31px, var(--borderMuted) 31px, var(--borderMuted) 32px, transparent 32px),
-    color-mix(in srgb, var(--body-bg) 72%, transparent);
+  border-radius: 4px;
+  background: var(--body-bg);
   color: var(--text);
   font-family: inherit;
   font-size: 13px;
-  transition: border-color .15s ease, box-shadow .15s ease;
-}
-[data-pi-session-ui="radix"] .sidebar-controls::before {
-  position: absolute;
-  z-index: 1;
-  width: 16px;
-  height: 16px;
-  margin: 11px 0 0 10px;
-  border: 1.5px solid var(--muted);
-  border-radius: 50%;
-  content: "";
-  pointer-events: none;
-}
-[data-pi-session-ui="radix"] .sidebar-controls::after {
-  position: absolute;
-  z-index: 1;
-  width: 6px;
-  height: 1.5px;
-  margin: -8px 0 0 23px;
-  background: var(--muted);
-  content: "";
-  pointer-events: none;
-  transform: rotate(45deg);
 }
 [data-pi-session-ui="radix"] .sidebar-search:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
 }
 [data-pi-session-ui="radix"] .filter-btn,
 [data-pi-session-ui="radix"] :is(.header-toggle-btn, .download-json-btn, .sidebar-close) {
   min-height: 30px;
-  padding: 4px 10px;
+  padding: 4px 8px;
   border: 1px solid var(--borderMuted);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--container-bg) 82%, transparent);
+  border-radius: 4px;
+  background: transparent;
   color: var(--muted);
   font-family: inherit;
   font-size: 12px;
-  font-weight: 600;
-  transition: background .15s ease, border-color .15s ease, color .15s ease;
+  font-weight: 500;
 }
 [data-pi-session-ui="radix"] .filter-btn:hover,
 [data-pi-session-ui="radix"] :is(.header-toggle-btn, .download-json-btn, .sidebar-close):hover {
-  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
   background: var(--selectedBg);
   color: var(--text);
 }
 [data-pi-session-ui="radix"] .filter-btn.active {
-  border-color: color-mix(in srgb, var(--accent) 58%, transparent);
-  background: color-mix(in srgb, var(--accent) 16%, var(--container-bg));
+  border-color: var(--accent);
+  background: var(--selectedBg);
   color: var(--accent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 9%, transparent);
 }
 [data-pi-session-ui="radix"] .tree-container {
   overflow-x: hidden;
@@ -200,10 +166,10 @@ const SESSION_STYLE = `
 }
 [data-pi-session-ui="radix"] .tree-node {
   min-height: 30px;
-  margin: 2px 0;
+  margin: 1px 0;
   padding: 6px 8px;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: 3px;
   font-size: 11px;
   line-height: 18px;
 }
@@ -233,36 +199,22 @@ const SESSION_STYLE = `
   background: color-mix(in srgb, var(--accent) 22%, transparent);
 }
 [data-pi-session-ui="radix"] #content {
-  padding: 32px clamp(20px, 4vw, 64px) 80px;
+  padding: 24px clamp(16px, 4vw, 48px) 64px;
 }
 [data-pi-session-ui="radix"] #content > * {
-  max-width: 1080px;
+  max-width: 960px;
 }
 [data-pi-session-ui="radix"] .header {
-  margin-bottom: 16px;
-  padding: 22px 24px;
+  margin-bottom: 12px;
+  padding: 16px;
   border: 1px solid var(--borderMuted);
-  border-radius: 16px;
-  background:
-    linear-gradient(135deg, color-mix(in srgb, var(--accent) 6%, transparent), transparent 52%),
-    color-mix(in srgb, var(--container-bg) 92%, transparent);
-  box-shadow: 0 18px 50px rgb(0 0 0 / 10%);
+  border-radius: 6px;
+  background: var(--container-bg);
 }
 [data-pi-session-ui="radix"] .header h1 {
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   color: var(--text);
   font-size: 16px;
-  letter-spacing: -.02em;
-}
-[data-pi-session-ui="radix"] .header h1::before {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  margin-right: 10px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 14px var(--accent);
-  content: "";
 }
 [data-pi-session-ui="radix"] .header-info {
   display: grid;
@@ -272,9 +224,7 @@ const SESSION_STYLE = `
 }
 [data-pi-session-ui="radix"] .info-item {
   min-width: 0;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--body-bg) 52%, transparent);
+  padding: 2px 0;
 }
 [data-pi-session-ui="radix"] .info-label {
   min-width: auto;
@@ -288,32 +238,26 @@ const SESSION_STYLE = `
   white-space: nowrap;
 }
 [data-pi-session-ui="radix"] .help-bar {
-  margin-bottom: 16px;
-  padding: 12px 14px;
-  border: 1px solid var(--borderMuted);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--container-bg) 76%, transparent);
+  margin-bottom: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--borderMuted);
   color: var(--muted);
 }
 [data-pi-session-ui="radix"] #messages {
-  gap: 16px;
+  gap: 12px;
 }
 [data-pi-session-ui="radix"] :is(.user-message, .assistant-message, .skill-user-entry) {
   overflow: hidden;
   border: 1px solid var(--borderMuted);
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--container-bg) 88%, transparent);
-  box-shadow: 0 16px 42px rgb(0 0 0 / 8%);
+  border-radius: 6px;
+  background: var(--container-bg);
 }
 [data-pi-session-ui="radix"] .user-message {
-  padding: 20px;
-  border-color: color-mix(in srgb, var(--accent) 24%, var(--borderMuted));
-  background:
-    linear-gradient(110deg, color-mix(in srgb, var(--accent) 7%, transparent), transparent 42%),
-    var(--userMessageBg);
+  padding: 16px;
+  background: var(--userMessageBg);
 }
 [data-pi-session-ui="radix"] .assistant-message {
-  padding: 18px 0 20px;
+  padding: 16px 0;
 }
 [data-pi-session-ui="radix"] .message-timestamp {
   padding: 0 20px 8px !important;
@@ -326,20 +270,20 @@ const SESSION_STYLE = `
   padding: 0 20px;
 }
 [data-pi-session-ui="radix"] .copy-link-btn {
-  top: 12px;
-  right: 12px;
-  width: 32px;
-  height: 32px;
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
   border-color: var(--borderMuted);
-  border-radius: 9px;
-  background: var(--container-bg);
+  border-radius: 4px;
+  background: transparent;
   color: var(--muted);
 }
 [data-pi-session-ui="radix"] :is(.tool-execution, .compaction, .system-prompt, .tools-list, .hook-message, .skill-invocation, .branch-summary) {
   margin-inline: 20px;
   padding: 14px 16px;
   border: 1px solid var(--borderMuted);
-  border-radius: 12px;
+  border-radius: 4px;
 }
 [data-pi-session-ui="radix"] .tool-execution + .tool-execution,
 [data-pi-session-ui="radix"] .assistant-text + .tool-execution {
@@ -377,8 +321,8 @@ const SESSION_STYLE = `
   padding: 14px 16px;
   overflow-x: auto;
   border: 1px solid var(--borderMuted);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--body-bg) 82%, transparent);
+  border-radius: 4px;
+  background: var(--body-bg);
 }
 [data-pi-session-ui="radix"] .markdown-content pre:not(.pi-mermaid-source) code {
   font-size: 12px;
@@ -391,7 +335,7 @@ const SESSION_STYLE = `
   border-collapse: separate;
   border-spacing: 0;
   border: 1px solid var(--mdCodeBlockBorder);
-  border-radius: 12px;
+  border-radius: 4px;
   overflow-x: auto;
 }
 [data-pi-session-ui="radix"] .markdown-content :is(th, td) {
@@ -406,10 +350,8 @@ const SESSION_STYLE = `
   background: color-mix(in srgb, var(--selectedBg) 72%, transparent);
 }
 [data-pi-session-ui="radix"] .markdown-content blockquote {
-  padding: 10px 14px;
+  padding: 6px 12px;
   border-left-width: 2px;
-  border-radius: 0 8px 8px 0;
-  background: color-mix(in srgb, var(--selectedBg) 45%, transparent);
   font-style: normal;
 }
 [data-pi-session-ui="radix"] :is(*, *::before, *::after) {
@@ -417,36 +359,30 @@ const SESSION_STYLE = `
   scrollbar-color: var(--scrollbarThumb) transparent;
 }
 [data-pi-session-ui="radix"] #hamburger {
-  top: 14px;
-  left: 14px;
-  width: 38px;
-  height: 38px;
+  top: 12px;
+  left: 12px;
+  width: 36px;
+  height: 36px;
   padding: 0;
   border: 1px solid var(--borderMuted);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--container-bg) 94%, transparent);
+  border-radius: 4px;
+  background: var(--container-bg);
   color: var(--text);
-  box-shadow: 0 10px 30px rgb(0 0 0 / 18%);
 }
 @media (max-width: 900px) {
   [data-pi-session-ui="radix"] #sidebar {
     width: min(var(--sidebar-width), calc(100vw - 40px));
     min-width: min(var(--sidebar-width), calc(100vw - 40px));
     max-width: min(var(--sidebar-width), calc(100vw - 40px));
-    box-shadow: 24px 0 70px rgb(0 0 0 / 36%);
   }
   [data-pi-session-ui="radix"] #sidebar-overlay.open {
     background: rgb(2 6 23 / 64%);
-    backdrop-filter: blur(3px);
   }
   [data-pi-session-ui="radix"] #content {
     padding: 68px 14px 48px;
   }
   [data-pi-session-ui="radix"] .header-info {
     grid-template-columns: 1fr;
-  }
-  [data-pi-session-ui="radix"] :is(.user-message, .assistant-message, .skill-user-entry) {
-    border-radius: 13px;
   }
   [data-pi-session-ui="radix"] .user-message,
   [data-pi-session-ui="radix"] .assistant-text {
