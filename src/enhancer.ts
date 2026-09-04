@@ -22,7 +22,7 @@ style.textContent = `
 .pi-mermaid-toolbar button:hover { background: color-mix(in srgb, currentColor 14%, transparent); }
 .pi-mermaid-viewport { min-height: 18rem; max-height: 75vh; overflow: hidden; padding: 1rem; cursor: grab; touch-action: none; }
 .pi-mermaid-viewport:active { cursor: grabbing; }
-.pi-mermaid-stage { width: 100%; transform-origin: 0 0; will-change: transform; }
+.pi-mermaid-stage { width: 100%; transform-origin: 0 0; }
 .pi-mermaid-stage svg { display: block; width: 100%; max-width: none !important; height: auto; margin: auto; }
 .pi-mermaid-source { max-height: 60vh; margin: 0; overflow: auto; padding: 1rem; white-space: pre; }
 .pi-mermaid-source[hidden], .pi-mermaid-viewport[hidden] { display: none; }
@@ -67,7 +67,8 @@ function button(action: string, label: string): HTMLButtonElement {
 }
 
 function applyTransform(stage: HTMLElement, state: ViewState): void {
-  stage.style.transform = `translate(${state.x}px, ${state.y}px) scale(${state.scale})`;
+  stage.style.width = `${state.scale * 100}%`;
+  stage.style.transform = `translate(${state.x}px, ${state.y}px)`;
 }
 
 function setScale(

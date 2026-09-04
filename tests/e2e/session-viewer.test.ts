@@ -126,16 +126,12 @@ test("loads a real Pi export and enhances Mermaid diagrams", async ({
   );
   await card.getByRole("button", { name: "Diagram" }).click();
 
+  const stage = card.locator(".pi-mermaid-stage");
   await card.getByRole("button", { name: "+" }).click();
-  await expect(card.locator(".pi-mermaid-stage")).toHaveAttribute(
-    "style",
-    /scale\(1\.25\)/,
-  );
+  await expect(stage).toHaveAttribute("style", /width: 125%/);
+  expect(await stage.getAttribute("style")).not.toContain("scale(");
   await card.getByRole("button", { name: "−" }).click();
-  await expect(card.locator(".pi-mermaid-stage")).toHaveAttribute(
-    "style",
-    /scale\(1\)/,
-  );
+  await expect(stage).toHaveAttribute("style", /width: 100%/);
   await card.getByRole("button", { name: "Fit" }).click();
 
   const viewport = card.locator(".pi-mermaid-viewport");
@@ -151,15 +147,13 @@ test("loads a real Pi export and enhances Mermaid diagrams", async ({
     viewportBox.y + viewportBox.height / 2 + 20,
   );
   await page.mouse.up();
-  expect(
-    await card.locator(".pi-mermaid-stage").getAttribute("style"),
-  ).not.toContain("translate(0px, 0px)");
+  expect(await stage.getAttribute("style")).not.toContain(
+    "translate(0px, 0px)",
+  );
 
   await card.getByRole("button", { name: "Reset" }).click();
-  await expect(card.locator(".pi-mermaid-stage")).toHaveAttribute(
-    "style",
-    /translate\(0px, 0px\) scale\(1\)/,
-  );
+  await expect(stage).toHaveAttribute("style", /translate\(0px, 0px\)/);
+  await expect(stage).toHaveAttribute("style", /width: 100%/);
 
   await frame.locator("body").evaluate(() => {
     Object.defineProperty(navigator, "clipboard", {
