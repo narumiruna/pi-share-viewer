@@ -20,16 +20,8 @@ for (const viewport of viewports) {
         name: "Share Pi sessions.",
       }),
     ).toBeVisible();
-    await expect(
-      page.getByRole("img", { name: "Pi session preview" }),
-    ).toBeVisible();
-    await expect(page.getByRole("link", { name: "Setup" })).toHaveAttribute(
-      "href",
-      "#setup",
-    );
-    await expect(page.getByRole("link", { name: "Features" })).toHaveAttribute(
-      "href",
-      "#features",
+    await expect(page.locator(".hero-lead")).toHaveText(
+      "A self-hosted viewer for /share.",
     );
     await expect(
       page.getByRole("link", { name: "View Pi Share Viewer on GitHub" }),
@@ -45,9 +37,6 @@ for (const viewport of viewports) {
     ).toBeVisible();
     await expect(page.getByText("PI_SHARE_VIEWER_URL")).toContainText(
       `export PI_SHARE_VIEWER_URL="${sessionUrl.href}"`,
-    );
-    await expect(page.locator("#preview-origin")).toHaveText(
-      `${sessionUrl.host}${sessionUrl.pathname}`,
     );
     await expect(
       page.getByText("Secret Gists are unlisted, not private."),
