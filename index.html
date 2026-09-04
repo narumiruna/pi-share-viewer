@@ -53,66 +53,129 @@
 
     <main class="landing-main">
       <section class="hero" aria-labelledby="hero-title">
-        <h1 id="hero-title">Share Pi sessions.</h1>
-        <p class="hero-lead">A self-hosted viewer for <code>/share</code>.</p>
+        <div class="hero-copy">
+          <p class="eyebrow"><span aria-hidden="true"></span>Open source · Self-hosted</p>
+          <h1 id="hero-title">Share Pi sessions.</h1>
+          <p class="hero-lead">A self-hosted viewer for <code>/share</code>.</p>
+          <p class="hero-detail">
+            Turn a complete coding session into a clean, readable link—Mermaid
+            diagrams included.
+          </p>
+          <div class="hero-actions">
+            <a class="primary-action" href="#setup">
+              Get started
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m9 18 6-6-6-6"/>
+              </svg>
+            </a>
+            <span class="hero-note">No Pi extension required</span>
+          </div>
+        </div>
+
+        <div
+          class="session-preview"
+          role="img"
+          aria-label="Example Pi sharing workflow"
+        >
+          <div class="preview-titlebar">
+            <div class="window-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+            <span>pi · session</span>
+            <span class="preview-status"><i aria-hidden="true"></i> Ready</span>
+          </div>
+          <div class="preview-terminal" aria-hidden="true">
+            <p><span class="prompt">›</span> <strong>/share</strong></p>
+            <p class="terminal-muted">Creating secret Gist…</p>
+            <div class="terminal-result">
+              <span class="result-icon">✓</span>
+              <div>
+                <span>Session ready</span>
+                <code>your-viewer.example/session/#gist</code>
+              </div>
+            </div>
+          </div>
+          <div class="preview-meta" aria-hidden="true">
+            <span>Prompts</span>
+            <span>Tool output</span>
+            <span>Mermaid</span>
+          </div>
+        </div>
       </section>
 
       <section id="setup" class="setup-section" aria-labelledby="setup-title">
         <div class="section-heading">
-          <h2 id="setup-title">Setup</h2>
+          <div>
+            <p class="section-kicker">Quick setup</p>
+            <h2 id="setup-title">Setup</h2>
+            <p class="section-title-detail">Two steps. One shareable session.</p>
+          </div>
+          <p>Configure the viewer before starting Pi, then use the built-in command.</p>
         </div>
 
         <div class="setup-grid">
-          <article class="setup-card">
-            <span class="step-number">01</span>
-            <div>
-              <div class="setup-card-header">
+          <article class="setup-card setup-card-wide">
+            <div class="setup-card-header">
+              <div>
+                <span class="step-number">01</span>
                 <h3>Set the viewer URL</h3>
-                <button
-                  class="copy-button"
-                  type="button"
-                  data-copy-target="setup-command"
-                  aria-label="Copy setup command"
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <rect x="8" y="8" width="11" height="11" rx="2"/>
-                    <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>
-                  </svg>
-                  <span>Copy</span>
-                </button>
               </div>
-              <pre><code id="setup-command">export PI_SHARE_VIEWER_URL="https://your-viewer.example/session/"
-pi</code></pre>
+              <button
+                class="copy-button"
+                type="button"
+                data-copy-target="setup-command"
+                aria-label="Copy setup command"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <rect x="8" y="8" width="11" height="11" rx="2"/>
+                  <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>
+                </svg>
+                <span>Copy</span>
+              </button>
             </div>
+            <p class="setup-description">Point Pi at this viewer before launch.</p>
+            <pre><code id="setup-command">export PI_SHARE_VIEWER_URL="https://your-viewer.example/session/"
+pi</code></pre>
           </article>
           <article class="setup-card">
-            <span class="step-number">02</span>
-            <div>
-              <div class="setup-card-header">
-                <h3>Share</h3>
-                <button
-                  class="copy-button"
-                  type="button"
-                  data-copy-target="share-command"
-                  aria-label="Copy share command"
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <rect x="8" y="8" width="11" height="11" rx="2"/>
-                    <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>
-                  </svg>
-                  <span>Copy</span>
-                </button>
+            <div class="setup-card-header">
+              <div>
+                <span class="step-number">02</span>
+                <h3>Share from Pi</h3>
               </div>
-              <pre><code id="share-command">/share</code></pre>
+              <button
+                class="copy-button"
+                type="button"
+                data-copy-target="share-command"
+                aria-label="Copy share command"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <rect x="8" y="8" width="11" height="11" rx="2"/>
+                  <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>
+                </svg>
+                <span>Copy</span>
+              </button>
             </div>
+            <p class="setup-description">Run Pi's built-in sharing command.</p>
+            <pre><code id="share-command">/share</code></pre>
           </article>
         </div>
       </section>
 
       <aside class="privacy-notice">
-        <p>Secret Gists are unlisted, not private.</p>
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 3 3.5 6.5v5.3c0 4.6 3.6 7.8 8.5 9.2 4.9-1.4 8.5-4.6 8.5-9.2V6.5L12 3Z"/>
+          <path d="M12 8v5M12 16.5v.1"/>
+        </svg>
+        <div>
+          <p><strong>Share with care.</strong> Secret Gists are unlisted, not private.</p>
+          <span>Anyone with the link can read the complete session.</span>
+        </div>
       </aside>
     </main>
+
+    <footer class="landing-footer">
+      <span>Pi Share Viewer</span>
+      <span>Sessions stay between your browser and GitHub.</span>
+    </footer>
 
     <script type="module" src="/src/home.ts"></script>
   </body>
