@@ -1,6 +1,6 @@
 import { MAX_SESSION_HTML_BYTES } from "./gist.js";
 
-const MAX_ENHANCER_BYTES = 8 * 1024 * 1024;
+const MAX_RUNTIME_BYTES = 8 * 1024 * 1024;
 
 const CHILD_CSP = [
   "default-src 'none'",
@@ -10,7 +10,7 @@ const CHILD_CSP = [
   "font-src data:",
   "media-src data: blob:",
   "connect-src 'none'",
-  "frame-src 'none'",
+  "frame-src blob:",
   "worker-src 'none'",
   "object-src 'none'",
   "base-uri 'none'",
@@ -28,13 +28,17 @@ function escapeInlineScript(source: string): string {
 export function injectMermaidEnhancer(
   sessionHtml: string,
   enhancerSource: string,
+  rendererSource: string,
   gistId: string,
   viewerOrigin: string,
 ): string {
   if (byteLength(sessionHtml) > MAX_SESSION_HTML_BYTES) {
     throw new Error("Session is too large to display safely.");
   }
-  if (byteLength(enhancerSource) > MAX_ENHANCER_BYTES) {
+  if (
+    byteLength(enhancerSource) > MAX_RUNTIME_BYTES ||
+    byteLength(rendererSource) > MAX_RUNTIME_BYTES
+  ) {
     throw new Error("Mermaid viewer runtime is unexpectedly large.");
   }
   if (!/^[0-9a-f]{32}$/i.test(gistId)) {
@@ -69,7 +73,10 @@ export function injectMermaidEnhancer(
   baseUrl.content = `${origin.origin}/session/#${gistId.toLowerCase()}`;
 
   const runtime = document.createElement("script");
-  runtime.textContent = escapeInlineScript(enhancerSource);
+  const rendererConfig = `Object.defineProperty(globalThis, "__PI_MERMAID_RENDERER_SOURCE__", { configurable: false, enumerable: false, writable: false, value: ${JSON.stringify(rendererSource)} });\n`;
+  runtime.textContent = escapeInlineScript(
+    `${rendererConfig}${enhancerSource}`,
+  );
 
   document.head.prepend(policy, baseUrl);
   document.body.append(runtime);

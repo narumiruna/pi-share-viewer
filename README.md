@@ -12,20 +12,21 @@ No Pi extension is required. Pi's built-in `/share` already creates `session.htm
 flowchart LR
     U[Pi user] -->|built-in /share| P[Pi]
     P -->|gh gist create --public=false| G[Secret Gist: session.html]
-    P -->|PI_SHARE_VIEWER_URL| URL[pi.narumi.dev/session/#gist-id]
+    P -->|PI_SHARE_VIEWER_URL| URL[viewer.example.com/session/#gist-id]
     URL --> W[Static viewer]
     W -->|GitHub Gist API| G
     W --> I[Sandboxed Pi session]
-    I --> M[Bundled Mermaid parser and layout]
+    I --> R[Disposable sandboxed renderer]
+    R -->|SVG or terminate at deadline| M[Bundled Mermaid parser and layout]
     M --> D[Browser-only semantic decorator]
     D --> SVG[Polished interactive SVG]
 ```
 
-Pi `0.85.0` is the verified baseline. Its exported DOM does not retain a `language-mermaid` class, so the viewer reads the original fenced sources from `#session-data` and matches them to rendered code blocks.
+Pi `0.85.0` is the verified baseline. Its exported DOM does not retain a `language-mermaid` class, so the viewer reads every fenced-code occurrence from `#session-data` and correlates it with rendered blocks by entry and source order. This preserves fence identity when ordinary and Mermaid blocks contain the same text, including fences nested in Markdown block quotes and lists.
 
 ### Browser-only diagram polish
 
-Diagram conversion runs entirely inside the sandboxed browser iframe. Mermaid remains the syntax and layout engine; a local semantic decorator adds an Archify-inspired signal-flow surface, stable node colors, high-contrast edges, diagram-type labels, and opt-in trace motion. No diagram source is sent to a rendering API, and unsupported SVG details fall back to Mermaid's normal output instead of failing the session.
+Diagram conversion runs entirely in the browser. Each Mermaid render uses a disposable nested sandbox iframe that is removed at the five-second deadline, terminating that renderer before the queue continues. Mermaid remains the syntax and layout engine; a local semantic decorator adds an Archify-inspired signal-flow surface, stable node colors, high-contrast edges, diagram-type labels, and opt-in trace motion. No diagram source is sent to a rendering API, and unsupported SVG details fall back to Mermaid's normal output instead of failing the session.
 
 The progressive decorator is verified for `flowchart`, `sequenceDiagram`, and `stateDiagram-v2`. Other Mermaid diagram types still render with the bundled Mermaid theme and existing viewer controls.
 
@@ -47,10 +48,10 @@ Authenticate GitHub CLI if needed:
 gh auth login
 ```
 
-Set the viewer URL **before starting Pi**. The trailing `/` is required because Pi appends `#<gist-id>` directly:
+Set the viewer URL **before starting Pi**, replacing the example host with your deployment origin. The trailing `/` is required because Pi appends `#<gist-id>` directly:
 
 ```bash
-export PI_SHARE_VIEWER_URL="https://pi.narumi.dev/session/"
+export PI_SHARE_VIEWER_URL="https://viewer.example.com/session/"
 pi
 ```
 
@@ -63,7 +64,7 @@ Run the built-in command in Pi:
 When `/share` uses its GitHub fallback, Pi returns:
 
 ```text
-https://pi.narumi.dev/session/#<32-character-gist-id>
+https://viewer.example.com/session/#<32-character-gist-id>
 ```
 
 ### Radius behavior
@@ -96,11 +97,11 @@ The viewer treats every Gist as untrusted:
 
 - Only a 32-character hexadecimal Gist ID and the fixed `session.html` filename are accepted.
 - Raw content must use HTTPS on the exact `gist.githubusercontent.com` host and match the requested Gist and filename.
-- API metadata, session HTML, Mermaid source count, source bytes, and render time have explicit limits.
+- API metadata, session HTML, Mermaid source count, source bytes, rendered SVG bytes, and render time have explicit limits.
 - Remote errors are written with `textContent`, never inserted into the parent page as HTML.
-- The session runs in an iframe with `allow-scripts allow-downloads`, without `allow-same-origin`, forms, popups, or top navigation.
+- The session runs in an iframe with only `allow-scripts`, without downloads, `allow-same-origin`, forms, popups, or top navigation.
 - Separate parent and child Content Security Policies prevent the session from making network requests or loading external images. The parent permits inline script and style only because `srcdoc` inherits its policy; remote values never enter the parent as HTML.
-- Mermaid and the visual decorator are bundled locally, make no rendering-service requests, and use `securityLevel: "strict"`.
+- Mermaid runs in a disposable nested sandbox that is terminated at the render deadline; the local runtime makes no rendering-service requests and uses `securityLevel: "strict"`.
 - A broken or oversized diagram keeps its source visible and does not stop the rest of the session.
 
 The parent page calls GitHub's unauthenticated Gist API directly. GitHub can rate-limit requests by IP; the viewer reports 403 and 429 responses without embedding a GitHub token. A server-side proxy or OAuth flow is intentionally out of scope.
@@ -109,7 +110,7 @@ The parent page calls GitHub's unauthenticated Gist API directly. GitHub can rat
 
 Requirements:
 
-- Node.js 22.19 or newer
+- Node.js 22.22.2 or newer
 - Google Chrome for the Playwright suite
 
 Install and start Vite:
@@ -202,11 +203,12 @@ Dockerfile                 Multi-stage production image
 nginx.conf                 Static routes, caching, and security headers
 compose.yaml               Self-hosted deployment
 vite.config.ts             Static application build
-vite.enhancer.config.ts    Bundled iframe runtime build
+vite.enhancer.config.ts    Bundled session enhancer build
+vite.renderer.config.ts    Isolated Mermaid renderer build
 tests/                     Unit and browser integration tests
 ```
 
-Generated files such as `dist/`, `public/assets/mermaid-enhancer.js`, Playwright reports, screenshots, and temporary Pi exports are ignored by Git.
+Generated files such as `dist/`, `public/assets/mermaid-enhancer.js`, `public/assets/mermaid-renderer.js`, Playwright reports, screenshots, and temporary Pi exports are ignored by Git.
 
 ## Limits and non-goals
 

@@ -15,6 +15,7 @@ describe("session enhancement injection", () => {
     const output = injectMermaidEnhancer(
       SESSION_HTML,
       'globalThis.loaded = "</script><script>bad()</script>";',
+      "globalThis.rendererLoaded = true;",
       GIST_ID,
       "https://pi.narumi.dev",
     );
@@ -23,6 +24,9 @@ describe("session enhancement injection", () => {
       output.indexOf("session-data"),
     );
     expect(output).toContain("connect-src 'none'");
+    expect(output).toContain("frame-src blob:");
+    expect(output).toContain("__PI_MERMAID_RENDERER_SOURCE__");
+    expect(output).toContain("globalThis.rendererLoaded = true;");
     expect(output).toContain(`https://pi.narumi.dev/session/#${GIST_ID}`);
     expect(output).toContain("<\\/script><script>bad()<\\/script>");
     expect(output.lastIndexOf("globalThis.loaded")).toBeGreaterThan(
@@ -38,6 +42,7 @@ describe("session enhancement injection", () => {
     const output = injectMermaidEnhancer(
       sessionWithTemplate,
       "globalThis.enhanced = true;",
+      "globalThis.rendererLoaded = true;",
       GIST_ID,
       "http://localhost:4173",
     );
@@ -52,6 +57,7 @@ describe("session enhancement injection", () => {
       injectMermaidEnhancer(
         "<html><head></head><body>malicious</body></html>",
         "runtime",
+        "renderer",
         GIST_ID,
         "https://pi.narumi.dev",
       ),
@@ -60,6 +66,7 @@ describe("session enhancement injection", () => {
       injectMermaidEnhancer(
         SESSION_HTML,
         "runtime",
+        "renderer",
         GIST_ID,
         "http://example.com",
       ),

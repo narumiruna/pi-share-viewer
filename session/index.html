@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.github.com https://gist.githubusercontent.com; frame-src 'self'; base-uri 'none'; form-action 'none'"
+      content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.github.com https://gist.githubusercontent.com; frame-src 'self' blob:; base-uri 'none'; form-action 'none'"
     >
     <title>Session Preview · pi-share-viewer</title>
     <link rel="stylesheet" href="/src/site.css">
@@ -29,7 +29,7 @@
       id="preview"
       class="preview-frame"
       title="Pi session preview"
-      sandbox="allow-scripts allow-downloads"
+      sandbox="allow-scripts"
       allow="fullscreen"
       allowfullscreen
       hidden

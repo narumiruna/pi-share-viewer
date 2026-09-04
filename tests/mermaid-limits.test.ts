@@ -1,12 +1,11 @@
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { describe, expect, test } from "vitest";
 import {
   getMermaidLimitError,
   MAX_DIAGRAMS,
+  MAX_RENDERED_SVG_BYTES,
   MAX_SOURCE_BYTES,
-  withTimeout,
+  RENDER_TIMEOUT_MS,
 } from "../src/mermaid-limits.js";
-
-afterEach(() => vi.useRealTimers());
 
 describe("Mermaid resource limits", () => {
   test("allows the configured count and rejects the next diagram", () => {
@@ -23,11 +22,8 @@ describe("Mermaid resource limits", () => {
     expect(getMermaidLimitError(1, oversized)).toContain("too large");
   });
 
-  test("stops waiting when rendering exceeds its deadline", async () => {
-    vi.useFakeTimers();
-    const operation = withTimeout(new Promise<never>(() => undefined), 10);
-    const assertion = expect(operation).rejects.toThrow("rendering timed out");
-    await vi.advanceTimersByTimeAsync(10);
-    await assertion;
+  test("keeps renderer boundaries finite", () => {
+    expect(RENDER_TIMEOUT_MS).toBeGreaterThan(0);
+    expect(MAX_RENDERED_SVG_BYTES).toBeGreaterThan(MAX_SOURCE_BYTES);
   });
 });

@@ -15,14 +15,15 @@
     "session-viewer"
   ],
   "engines": {
-    "node": ">=22.19.0"
+    "node": ">=22.22.2"
   },
   "scripts": {
-    "build": "npm run build:enhancer && vite build",
+    "build": "npm run build:renderer && npm run build:enhancer && vite build",
     "build:enhancer": "vite build --config vite.enhancer.config.ts",
-    "dev": "npm run build:enhancer && vite",
+    "build:renderer": "vite build --config vite.renderer.config.ts",
+    "dev": "npm run build:renderer && npm run build:enhancer && vite",
     "preview": "vite preview",
-    "check": "biome ci src tests session index.html package.json tsconfig.json playwright.config.ts vite.config.ts vite.enhancer.config.ts vitest.config.ts",
+    "check": "biome ci src tests session index.html package.json tsconfig.json playwright.config.ts vite.config.ts vite.enhancer.config.ts vite.renderer.config.ts vitest.config.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "npm run build && playwright test",
@@ -49,6 +50,7 @@
     "@radix-ui/react-toggle": "^1.1.18",
     "@radix-ui/react-toolbar": "^1.1.19",
     "@radix-ui/react-tooltip": "^1.2.16",
+    "marked": "^18.0.11",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   }

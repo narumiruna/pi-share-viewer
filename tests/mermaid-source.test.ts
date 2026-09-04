@@ -2,17 +2,19 @@
 
 import { describe, expect, test } from "vitest";
 import {
+  extractCodeBlocks,
   extractMermaidFences,
   normalizeMermaidSource,
-  readSessionMermaidSources,
+  readSessionCodeBlocks,
 } from "../src/mermaid-source.js";
 
 describe("Mermaid source discovery", () => {
-  test("extracts only Mermaid fenced blocks", () => {
+  test("preserves fenced block identity when sources are identical", () => {
     const markdown = [
       "普通文字",
       "```typescript",
-      "const value = 1;",
+      "flowchart LR",
+      "  A --> B",
       "```",
       "```mermaid",
       "flowchart LR",
@@ -24,9 +26,33 @@ describe("Mermaid source discovery", () => {
       "~~~",
     ].join("\n");
 
+    expect(extractCodeBlocks(markdown)).toEqual([
+      { isMermaid: false, source: "flowchart LR\n  A --> B" },
+      { isMermaid: true, source: "flowchart LR\n  A --> B" },
+      { isMermaid: true, source: "sequenceDiagram\n  A->>B: hello" },
+    ]);
     expect(extractMermaidFences(markdown)).toEqual([
       "flowchart LR\n  A --> B",
       "sequenceDiagram\n  A->>B: hello",
+    ]);
+  });
+
+  test("extracts Mermaid fences from block quotes and list items", () => {
+    const markdown = [
+      "> ```mermaid",
+      "> flowchart LR",
+      ">   Quote --> Diagram",
+      "> ```",
+      "",
+      "- ```mermaid",
+      "  stateDiagram-v2",
+      "    [*] --> Listed",
+      "  ```",
+    ].join("\n");
+
+    expect(extractMermaidFences(markdown)).toEqual([
+      "flowchart LR\n  Quote --> Diagram",
+      "stateDiagram-v2\n  [*] --> Listed",
     ]);
   });
 
@@ -45,15 +71,17 @@ describe("Mermaid source discovery", () => {
     ]);
   });
 
-  test("reads string and text-part messages from Pi session data", () => {
+  test("maps string and text-part messages by entry ID", () => {
     const payload = {
       entries: [
         {
+          id: "first-entry",
           message: {
             content: "```mermaid\r\nflowchart LR\r\nA --> B\r\n```",
           },
         },
         {
+          id: "second-entry",
           message: {
             content: [
               { type: "image", data: "ignored" },
@@ -70,15 +98,21 @@ describe("Mermaid source discovery", () => {
       JSON.stringify(payload),
     ).toString("base64")}</script>`;
 
-    expect(readSessionMermaidSources(document)).toEqual(
-      new Set(["flowchart LR\nA --> B", "flowchart LR\nBroken -->"]),
+    expect(readSessionCodeBlocks(document)).toEqual(
+      new Map([
+        ["first-entry", [{ isMermaid: true, source: "flowchart LR\nA --> B" }]],
+        [
+          "second-entry",
+          [{ isMermaid: true, source: "flowchart LR\nBroken -->" }],
+        ],
+      ]),
     );
   });
 
   test("fails closed for malformed session data", () => {
     document.body.innerHTML =
       '<script id="session-data" type="application/json">not-base64</script>';
-    expect(readSessionMermaidSources(document).size).toBe(0);
+    expect(readSessionCodeBlocks(document).size).toBe(0);
     expect(normalizeMermaidSource("\r\n graph TD\r\n ")).toBe("graph TD");
   });
 });

@@ -385,12 +385,14 @@ const SESSION_STYLE = `
   line-height: 1.65;
 }
 [data-pi-session-ui="radix"] .markdown-content table {
+  display: block;
+  max-width: 100%;
   margin: 18px 0;
   border-collapse: separate;
   border-spacing: 0;
   border: 1px solid var(--mdCodeBlockBorder);
   border-radius: 12px;
-  overflow: hidden;
+  overflow-x: auto;
 }
 [data-pi-session-ui="radix"] .markdown-content :is(th, td) {
   padding: 10px 12px;

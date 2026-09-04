@@ -14,7 +14,7 @@ import {
 import * as Toggle from "@radix-ui/react-toggle";
 import * as Toolbar from "@radix-ui/react-toolbar";
 import * as Tooltip from "@radix-ui/react-tooltip";
-import { type ComponentType, createElement, useState } from "react";
+import { type ComponentType, createElement, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 
 export type DiagramToolbarAction =
@@ -28,6 +28,7 @@ export type DiagramToolbarAction =
   | "zoom-out";
 
 interface DiagramToolbarProps {
+  fullscreenTarget: HTMLElement;
   onAction: (
     action: DiagramToolbarAction,
     active?: boolean,
@@ -67,10 +68,20 @@ function Control({ action, icon: Icon, label, onAction }: ControlProps) {
   );
 }
 
-function DiagramToolbar({ onAction }: DiagramToolbarProps) {
+function DiagramToolbar({ fullscreenTarget, onAction }: DiagramToolbarProps) {
   const [sourceVisible, setSourceVisible] = useState(false);
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    const syncFullscreenState = () => {
+      setExpanded(document.fullscreenElement === fullscreenTarget);
+    };
+    document.addEventListener("fullscreenchange", syncFullscreenState);
+    return () => {
+      document.removeEventListener("fullscreenchange", syncFullscreenState);
+    };
+  }, [fullscreenTarget]);
 
   async function toggleSource(): Promise<void> {
     const visible = await onAction("source");

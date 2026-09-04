@@ -192,6 +192,36 @@ test("loads a real Pi export and enhances Mermaid diagrams", async ({
   ).toBe(true);
 
   await card.evaluate((element) => {
+    let fullscreenElement: Element | null = null;
+    Object.defineProperty(document, "fullscreenElement", {
+      configurable: true,
+      get: () => fullscreenElement,
+    });
+    element.requestFullscreen = async () => {
+      fullscreenElement = element;
+      document.dispatchEvent(new Event("fullscreenchange"));
+    };
+    (
+      window as Window & { simulateBrowserFullscreenExit?: () => void }
+    ).simulateBrowserFullscreenExit = () => {
+      fullscreenElement = null;
+      document.dispatchEvent(new Event("fullscreenchange"));
+    };
+  });
+  await card.getByRole("button", { name: "Open fullscreen" }).click();
+  await expect(
+    card.getByRole("button", { name: "Close fullscreen" }),
+  ).toBeVisible();
+  await frame.locator("body").evaluate(() => {
+    (
+      window as Window & { simulateBrowserFullscreenExit?: () => void }
+    ).simulateBrowserFullscreenExit?.();
+  });
+  await expect(
+    card.getByRole("button", { name: "Open fullscreen" }),
+  ).toBeVisible();
+
+  await card.evaluate((element) => {
     element.requestFullscreen = () => Promise.reject(new Error("denied"));
   });
   await card.getByRole("button", { name: "Open fullscreen" }).click();
@@ -207,25 +237,123 @@ test("loads a real Pi export and enhances Mermaid diagrams", async ({
     pre.append(code);
     body.append(pre);
   });
-  await expect(frame.locator(".pi-mermaid-card")).toHaveCount(2);
+  await expect(frame.locator(".pi-mermaid-card")).toHaveCount(1);
+  await expect(frame.locator("body > pre > code")).toContainText(
+    "Start[Start]",
+  );
   await frame
     .locator("body")
     .evaluate((body) => body.append(document.createElement("span")));
   await page.waitForTimeout(100);
-  await expect(frame.locator(".pi-mermaid-card")).toHaveCount(2);
+  await expect(frame.locator(".pi-mermaid-card")).toHaveCount(1);
   await page.screenshot({
     path: "test-results/desktop-dark.png",
     fullPage: true,
   });
 
   const iframe = page.locator("#preview");
-  await expect(iframe).toHaveAttribute(
-    "sandbox",
-    "allow-scripts allow-downloads",
-  );
+  await expect(iframe).toHaveAttribute("sandbox", "allow-scripts");
   await expect(iframe).toHaveAttribute("allow", "fullscreen");
   await expect(iframe).not.toHaveAttribute("sandbox", /allow-same-origin/);
   expect(cspErrors).toEqual([]);
+});
+
+test("preserves fence identity and supports Markdown containers", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const sourceHtml = await createExportFixture();
+  const html = replaceSessionText(
+    sourceHtml,
+    "A normal Markdown paragraph.",
+    `| Wide column |
+| --- |
+| ThisUnbreakableTableCellMustRemainReachableAcrossTheEntireNarrowMobileViewportWithoutBeingClipped |
+
+An ordinary quote of the same diagram must remain code.
+
+\`\`\`text
+flowchart LR
+  Start[Start] --> Finish[Finish]
+\`\`\`
+
+> \`\`\`mermaid
+> flowchart LR
+>   Quoted --> Diagram
+> \`\`\`
+
+- \`\`\`mermaid
+  stateDiagram-v2
+    [*] --> Listed
+  \`\`\``,
+  );
+  await mockGist(page, html);
+  await page.goto(`/session/#${DARK_GIST_ID}`);
+
+  const frame = page.frameLocator("#preview");
+  await expect(frame.locator(".pi-mermaid-card")).toHaveCount(3);
+  await expect(
+    frame
+      .locator(
+        '.markdown-content pre:not(.pi-mermaid-source) > code[data-pi-mermaid-state="ordinary"]',
+      )
+      .filter({ hasText: "Start[Start]" }),
+  ).toHaveCount(1);
+  await expect(frame.locator('[data-pi-mermaid-kind="flowchart"]')).toHaveCount(
+    2,
+  );
+  await expect(frame.locator('[data-pi-mermaid-kind="state"]')).toHaveCount(1);
+
+  const table = frame.locator(".markdown-content table");
+  await expect(table).toBeVisible();
+  const tableOverflow = await table.evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+  }));
+  expect(tableOverflow.scrollWidth).toBeGreaterThan(tableOverflow.clientWidth);
+  expect(
+    await table.evaluate((element) => {
+      element.scrollLeft = 40;
+      return element.scrollLeft > 0;
+    }),
+  ).toBe(true);
+});
+
+test("terminates an isolated renderer when its deadline expires", async ({
+  page,
+}) => {
+  test.setTimeout(15_000);
+  const html = await createExportFixture();
+  await mockGist(page, html);
+  await page.route("**/assets/mermaid-renderer.js", async (route) => {
+    await route.fulfill({
+      contentType: "application/javascript",
+      body: `window.addEventListener("message", (event) => {
+        const request = event.data;
+        if (request.source.includes("Broken")) {
+          window.parent.postMessage({
+            type: "pi-mermaid-render-result",
+            requestId: request.requestId,
+            error: "Synthetic invalid diagram.",
+          }, "*");
+          return;
+        }
+        const end = performance.now() + 30_000;
+        while (performance.now() < end) {}
+      });`,
+    });
+  });
+
+  await page.goto(`/session/#${DARK_GIST_ID}`);
+  const frame = page.frameLocator("#preview");
+  await expect(frame.locator(".pi-mermaid-error").first()).toContainText(
+    "rendering timed out",
+    { timeout: 8_000 },
+  );
+  await expect(frame.locator(".pi-mermaid-renderer-frame")).toHaveCount(0);
+  await expect(
+    frame.getByText("A normal Markdown paragraph.", { exact: true }),
+  ).toBeVisible();
 });
 
 test("renders safely at mobile and desktop sizes in dark and light sessions", async ({

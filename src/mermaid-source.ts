@@ -1,6 +1,23 @@
+import { lexer } from "marked";
+
 interface SessionPayload {
   entries?: unknown;
 }
+
+interface MarkdownToken {
+  type?: unknown;
+  lang?: unknown;
+  text?: unknown;
+  tokens?: unknown;
+  items?: unknown;
+}
+
+export interface SessionCodeBlock {
+  isMermaid: boolean;
+  source: string;
+}
+
+export type SessionCodeBlocks = Map<string, SessionCodeBlock[]>;
 
 function decodeBase64Utf8(value: string): string {
   const binary = atob(value);
@@ -26,57 +43,77 @@ function messageText(entry: unknown): string[] {
   });
 }
 
+function entryId(entry: unknown): string | undefined {
+  if (typeof entry !== "object" || entry === null) return undefined;
+  const id = (entry as { id?: unknown }).id;
+  return typeof id === "string" && id.length > 0 ? id : undefined;
+}
+
 export function normalizeMermaidSource(source: string): string {
   return source.replace(/\r\n?/g, "\n").trim();
 }
 
-export function extractMermaidFences(markdown: string): string[] {
-  const lines = markdown.replace(/\r\n?/g, "\n").split("\n");
-  const sources: string[] = [];
-
-  for (let index = 0; index < lines.length; index += 1) {
-    const opening = /^ {0,3}(`{3,}|~{3,})[ \t]*mermaid(?:[ \t]+.*)?$/i.exec(
-      lines[index],
-    );
-    if (!opening) continue;
-
-    const marker = opening[1][0];
-    const minimumLength = opening[1].length;
-    let closingIndex = index + 1;
-    while (closingIndex < lines.length) {
-      const closing = /^ {0,3}(`{3,}|~{3,})[ \t]*$/.exec(lines[closingIndex]);
-      if (
-        closing &&
-        closing[1][0] === marker &&
-        closing[1].length >= minimumLength
-      ) {
-        break;
-      }
-      closingIndex += 1;
-    }
-
-    sources.push(
-      normalizeMermaidSource(lines.slice(index + 1, closingIndex).join("\n")),
-    );
-    index = closingIndex;
-  }
-
-  return sources;
+function isMermaidInfoString(value: unknown): boolean {
+  return typeof value === "string" && /^mermaid(?:\s|$)/i.test(value.trim());
 }
 
-export function readSessionMermaidSources(
+function collectCodeBlocks(tokens: unknown, blocks: SessionCodeBlock[]): void {
+  if (!Array.isArray(tokens)) return;
+
+  for (const value of tokens) {
+    if (typeof value !== "object" || value === null) continue;
+    const token = value as MarkdownToken;
+    if (token.type === "code" && typeof token.text === "string") {
+      blocks.push({
+        isMermaid: isMermaidInfoString(token.lang),
+        source: normalizeMermaidSource(token.text),
+      });
+      continue;
+    }
+
+    if (Array.isArray(token.items)) {
+      for (const item of token.items) {
+        if (typeof item !== "object" || item === null) continue;
+        collectCodeBlocks((item as MarkdownToken).tokens, blocks);
+      }
+      continue;
+    }
+
+    collectCodeBlocks(token.tokens, blocks);
+  }
+}
+
+export function extractCodeBlocks(markdown: string): SessionCodeBlock[] {
+  const blocks: SessionCodeBlock[] = [];
+  collectCodeBlocks(lexer(markdown), blocks);
+  return blocks;
+}
+
+export function extractMermaidFences(markdown: string): string[] {
+  return extractCodeBlocks(markdown)
+    .filter((block) => block.isMermaid)
+    .map((block) => block.source);
+}
+
+export function readSessionCodeBlocks(
   root: Document = document,
-): Set<string> {
+): SessionCodeBlocks {
   const encoded = root.getElementById("session-data")?.textContent?.trim();
-  if (!encoded) return new Set();
+  if (!encoded) return new Map();
 
   try {
     const payload = JSON.parse(decodeBase64Utf8(encoded)) as SessionPayload;
-    if (!Array.isArray(payload.entries)) return new Set();
-    return new Set(
-      payload.entries.flatMap(messageText).flatMap(extractMermaidFences),
-    );
+    if (!Array.isArray(payload.entries)) return new Map();
+
+    const blocks: SessionCodeBlocks = new Map();
+    for (const entry of payload.entries) {
+      const id = entryId(entry);
+      if (!id) continue;
+      const entryBlocks = messageText(entry).flatMap(extractCodeBlocks);
+      if (entryBlocks.length > 0) blocks.set(id, entryBlocks);
+    }
+    return blocks;
   } catch {
-    return new Set();
+    return new Map();
   }
 }

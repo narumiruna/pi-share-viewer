@@ -16,6 +16,7 @@
     "playwright.config.ts",
     "vite.config.ts",
     "vite.enhancer.config.ts",
+    "vite.renderer.config.ts",
     "vitest.config.ts"
   ]
 }

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'"
     >
     <meta
       name="description"
@@ -56,7 +56,7 @@
         >
           <div class="preview-topbar">
             <div class="preview-dots" aria-hidden="true"><span></span><span></span><span></span></div>
-            <span>pi.narumi.dev/session</span>
+            <span id="preview-origin">your-viewer.example/session</span>
             <span class="preview-live"><span></span>Live</span>
           </div>
           <div class="preview-layout">
@@ -100,7 +100,7 @@
             <div>
               <h3>Point Pi at this viewer</h3>
               <p>Set the environment variable before launching Pi.</p>
-              <pre><code>export PI_SHARE_VIEWER_URL="https://pi.narumi.dev/session/"
+              <pre><code id="setup-command">export PI_SHARE_VIEWER_URL="https://your-viewer.example/session/"
 pi</code></pre>
             </div>
           </article>
@@ -149,5 +149,7 @@ pi</code></pre>
       <span>Pi Share Viewer</span>
       <span>Static, self-hosted, and open source.</span>
     </footer>
+
+    <script type="module" src="/src/home.ts"></script>
   </body>
 </html>

@@ -36,7 +36,12 @@ for (const viewport of viewports) {
         name: "Use Pi’s existing share flow.",
       }),
     ).toBeVisible();
-    await expect(page.getByText("PI_SHARE_VIEWER_URL")).toBeVisible();
+    await expect(page.getByText("PI_SHARE_VIEWER_URL")).toContainText(
+      'export PI_SHARE_VIEWER_URL="http://127.0.0.1:4173/session/"',
+    );
+    await expect(page.locator("#preview-origin")).toHaveText(
+      "127.0.0.1:4173/session/",
+    );
     await expect(
       page.getByText("GitHub secret Gists are unlisted", { exact: false }),
     ).toBeVisible();

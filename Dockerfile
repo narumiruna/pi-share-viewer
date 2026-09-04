@@ -1,10 +1,10 @@
-FROM node:22.22-alpine3.23 AS builder
+FROM node:22.22.2-alpine3.23 AS builder
 
 WORKDIR /app
 ENV HUSKY=0
 COPY package.json package-lock.json ./
 RUN npm ci
-COPY index.html tsconfig.json vite.config.ts vite.enhancer.config.ts ./
+COPY index.html tsconfig.json vite.config.ts vite.enhancer.config.ts vite.renderer.config.ts ./
 COPY session ./session
 COPY src ./src
 RUN npm run build

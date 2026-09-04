@@ -1,4 +1,3 @@
-import mermaid from "mermaid";
 import { decorateMermaidSvg } from "./diagram-style.js";
 import {
   type DiagramToolbarAction,
@@ -6,13 +5,16 @@ import {
 } from "./diagram-toolbar.js";
 import {
   getMermaidLimitError,
-  MAX_SOURCE_BYTES,
+  MAX_RENDERED_SVG_BYTES,
   RENDER_TIMEOUT_MS,
-  withTimeout,
 } from "./mermaid-limits.js";
 import {
+  isMermaidRenderResult,
+  MERMAID_RENDER_REQUEST,
+} from "./mermaid-render-protocol.js";
+import {
   normalizeMermaidSource,
-  readSessionMermaidSources,
+  readSessionCodeBlocks,
 } from "./mermaid-source.js";
 import { installSessionStyle } from "./session-style.js";
 import { isDarkColor } from "./theme.js";
@@ -87,6 +89,7 @@ style.textContent = `
 @keyframes pi-mermaid-trace { to { stroke-dashoffset: -16; } }
 .pi-mermaid-source { max-height: 60vh; margin: 0; overflow: auto; padding: 1rem; border: 0; background: var(--pi-diagram-panel); color: var(--pi-diagram-text); white-space: pre; }
 .pi-mermaid-source[hidden], .pi-mermaid-viewport[hidden] { display: none; }
+.pi-mermaid-renderer-frame { position: fixed; z-index: -1; top: 0; left: 0; width: 1024px; height: 768px; border: 0; opacity: 0; pointer-events: none; }
 .pi-mermaid-error { padding: 1rem; color: #ef4444; font: 500 .85rem/1.5 ui-monospace, monospace; }
 .pi-mermaid-card:fullscreen, .pi-mermaid-card.pi-mermaid-expanded { display: flex; position: fixed; inset: 0; z-index: 2147483647; width: 100vw; height: 100vh; margin: 0; border: 0; border-radius: 0; flex-direction: column; background: var(--pi-diagram-panel); color: var(--pi-diagram-text); }
 .pi-mermaid-card:fullscreen .pi-mermaid-viewport, .pi-mermaid-card.pi-mermaid-expanded .pi-mermaid-viewport { max-height: none; flex: 1; }
@@ -101,20 +104,6 @@ document.documentElement.dataset.piMermaidTheme = isDarkTheme
   ? "dark"
   : "light";
 installSessionStyle();
-mermaid.initialize({
-  startOnLoad: false,
-  securityLevel: "strict",
-  suppressErrorRendering: true,
-  theme: isDarkTheme ? "dark" : "default",
-  themeVariables: {
-    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
-    lineColor: isDarkTheme ? "#7890ad" : "#6f8fa4",
-    primaryBorderColor: isDarkTheme ? "#22d3ee" : "#0891b2",
-    primaryColor: isDarkTheme ? "#083344" : "#ecfeff",
-    primaryTextColor: isDarkTheme ? "#f5fbff" : "#102638",
-  },
-  maxTextSize: MAX_SOURCE_BYTES,
-});
 
 interface ViewState {
   fitScale: number;
@@ -123,7 +112,13 @@ interface ViewState {
   y: number;
 }
 
-const mermaidSources = readSessionMermaidSources();
+const rendererSource = (
+  globalThis as typeof globalThis & {
+    __PI_MERMAID_RENDERER_SOURCE__?: unknown;
+  }
+).__PI_MERMAID_RENDERER_SOURCE__;
+const sessionCodeBlocks = readSessionCodeBlocks();
+const entryBlockPositions = new WeakMap<HTMLElement, number>();
 let renderedCount = 0;
 let renderSequence = 0;
 let scanQueued = false;
@@ -237,8 +232,93 @@ function showRenderError(pre: HTMLPreElement, message: string): void {
   pre.before(error);
 }
 
+interface RenderedDiagram {
+  diagramType: string;
+  svg: string;
+}
+
+function escapeInlineScript(source: string): string {
+  return source.replace(/<\/script/gi, "<\\/script");
+}
+
+function renderMermaidInSandbox(source: string): Promise<RenderedDiagram> {
+  if (typeof rendererSource !== "string") {
+    return Promise.reject(
+      new Error("Mermaid renderer runtime is unavailable."),
+    );
+  }
+
+  const requestId = `${Date.now()}-${renderSequence++}`;
+  const rendererHtml = `<!doctype html><html><head><meta charset="UTF-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"></head><body><script>${escapeInlineScript(rendererSource)}</script></body></html>`;
+  const rendererUrl = URL.createObjectURL(
+    new Blob([rendererHtml], { type: "text/html" }),
+  );
+  const frame = document.createElement("iframe");
+  frame.className = "pi-mermaid-renderer-frame";
+  frame.setAttribute("aria-hidden", "true");
+  frame.sandbox.add("allow-scripts");
+  frame.src = rendererUrl;
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const cleanup = () => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      window.removeEventListener("message", receiveResult);
+      frame.remove();
+      URL.revokeObjectURL(rendererUrl);
+    };
+    const receiveResult = (event: MessageEvent) => {
+      if (
+        event.source !== frame.contentWindow ||
+        !isMermaidRenderResult(event.data, requestId)
+      ) {
+        return;
+      }
+
+      const result = event.data;
+      cleanup();
+      if ("error" in result) {
+        reject(new Error(result.error));
+        return;
+      }
+      if (new Blob([result.svg]).size > MAX_RENDERED_SVG_BYTES) {
+        reject(new Error("Rendered diagram is too large to display safely."));
+        return;
+      }
+      resolve({ diagramType: result.diagramType, svg: result.svg });
+    };
+    const timer = window.setTimeout(() => {
+      cleanup();
+      reject(new Error("Diagram rendering timed out."));
+    }, RENDER_TIMEOUT_MS);
+
+    window.addEventListener("message", receiveResult);
+    frame.addEventListener(
+      "load",
+      () => {
+        if (settled) return;
+        frame.contentWindow?.postMessage(
+          {
+            type: MERMAID_RENDER_REQUEST,
+            requestId,
+            source,
+            dark: isDarkTheme,
+          },
+          "*",
+        );
+      },
+      { once: true },
+    );
+    document.body.append(frame);
+  });
+}
+
 async function enhanceCode(code: HTMLElement): Promise<void> {
-  if (code.dataset.piMermaidState) return;
+  if (code.dataset.piMermaidState && code.dataset.piMermaidState !== "queued") {
+    return;
+  }
   code.dataset.piMermaidState = "processing";
 
   const pre = code.parentElement;
@@ -257,12 +337,7 @@ async function enhanceCode(code: HTMLElement): Promise<void> {
   }
 
   try {
-    const id = `pi-mermaid-${Date.now()}-${renderSequence++}`;
-    const diagramType = mermaid.detectType(source);
-    const rendered = await withTimeout(
-      mermaid.render(id, source),
-      RENDER_TIMEOUT_MS,
-    );
+    const rendered = await renderMermaidInSandbox(source);
     const card = document.createElement("section");
     card.className = "pi-mermaid-card";
     card.dataset.piMermaidState = "rendered";
@@ -283,7 +358,7 @@ async function enhanceCode(code: HTMLElement): Promise<void> {
     if (!(svg instanceof SVGSVGElement)) {
       throw new Error("Mermaid did not produce an SVG diagram.");
     }
-    const decoration = decorateMermaidSvg(svg, diagramType);
+    const decoration = decorateMermaidSvg(svg, rendered.diagramType);
     card.dataset.piMermaidKind = decoration.kind;
     toolbarBrand.textContent = `${decoration.kind} · browser rendered`;
     viewport.append(stage);
@@ -298,12 +373,12 @@ async function enhanceCode(code: HTMLElement): Promise<void> {
 
     card.append(toolbar, viewport, sourceView);
     pre.replaceWith(card);
-    rendered.bindFunctions?.(stage);
 
     const state: ViewState = { fitScale: 1, scale: 1, x: 0, y: 0 };
     fitToViewport(viewport, stage, svg, state);
     installPanZoom(viewport, stage, state);
     mountDiagramToolbar(controls, {
+      fullscreenTarget: card,
       onAction: async (action: DiagramToolbarAction, active?: boolean) => {
         switch (action) {
           case "zoom-in":
@@ -356,17 +431,43 @@ async function enhanceCode(code: HTMLElement): Promise<void> {
   }
 }
 
-function scan(): void {
-  scanQueued = false;
-  const codes = Array.from(
-    document.querySelectorAll<HTMLElement>("pre > code"),
-  ).filter(
-    (code) =>
-      !code.closest(".pi-mermaid-card") &&
-      mermaidSources.has(normalizeMermaidSource(code.textContent ?? "")),
+function scanEntry(entry: HTMLElement): void {
+  const blocks = sessionCodeBlocks.get(entry.id.slice("entry-".length));
+  if (!blocks) return;
+
+  let blockIndex = entryBlockPositions.get(entry) ?? 0;
+  const codes = entry.querySelectorAll<HTMLElement>(
+    ".markdown-content pre > code",
   );
   for (const code of codes) {
+    if (code.dataset.piMermaidState || code.closest(".pi-mermaid-card")) {
+      continue;
+    }
+
+    const block = blocks[blockIndex];
+    if (!block) break;
+    if (normalizeMermaidSource(code.textContent ?? "") !== block.source) {
+      continue;
+    }
+
+    blockIndex += 1;
+    if (!block.isMermaid) {
+      code.dataset.piMermaidState = "ordinary";
+      continue;
+    }
+
+    code.dataset.piMermaidState = "queued";
     renderQueue = renderQueue.then(() => enhanceCode(code));
+  }
+  entryBlockPositions.set(entry, blockIndex);
+}
+
+function scan(): void {
+  scanQueued = false;
+  for (const entry of document.querySelectorAll<HTMLElement>(
+    '[id^="entry-"]',
+  )) {
+    scanEntry(entry);
   }
 }
 

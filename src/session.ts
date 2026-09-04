@@ -13,8 +13,11 @@ function requiredElement<T extends HTMLElement>(id: string): T {
   return element as T;
 }
 
-async function loadEnhancerSource(signal: AbortSignal): Promise<string> {
-  const response = await fetch("/assets/mermaid-enhancer.js", {
+async function loadRuntimeSource(
+  path: string,
+  signal: AbortSignal,
+): Promise<string> {
+  const response = await fetch(path, {
     cache: "no-cache",
     signal,
   });
@@ -44,15 +47,17 @@ export async function loadViewer(): Promise<void> {
 
   try {
     const gistId = parseGistId(window.location.hash);
-    const [sessionHtml, enhancerSource] = await Promise.all([
+    const [sessionHtml, enhancerSource, rendererSource] = await Promise.all([
       loadSessionHtml(gistId, { signal: controller.signal }),
-      loadEnhancerSource(controller.signal),
+      loadRuntimeSource("/assets/mermaid-enhancer.js", controller.signal),
+      loadRuntimeSource("/assets/mermaid-renderer.js", controller.signal),
     ]);
     if (sequence !== loadSequence) return;
 
     frame.srcdoc = injectMermaidEnhancer(
       sessionHtml,
       enhancerSource,
+      rendererSource,
       gistId,
       window.location.origin,
     );
