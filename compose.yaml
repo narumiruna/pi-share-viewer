@@ -4,7 +4,7 @@ services:
   viewer:
     build: .
     ports:
-      - "${PORT:-8080}:80"
+      - "${PORT:-18080}:80"
     restart: unless-stopped
     read_only: true
     tmpfs:
