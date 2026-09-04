@@ -1,4 +1,5 @@
 import { MAX_SESSION_HTML_BYTES } from "./gist.js";
+import type { SiteTheme } from "./theme.js";
 
 const MAX_RUNTIME_BYTES = 8 * 1024 * 1024;
 
@@ -31,6 +32,7 @@ export function injectMermaidEnhancer(
   rendererSource: string,
   gistId: string,
   viewerOrigin: string,
+  theme?: SiteTheme,
 ): string {
   if (byteLength(sessionHtml) > MAX_SESSION_HTML_BYTES) {
     throw new Error("Session is too large to display safely.");
@@ -74,8 +76,9 @@ export function injectMermaidEnhancer(
 
   const runtime = document.createElement("script");
   const rendererConfig = `Object.defineProperty(globalThis, "__PI_MERMAID_RENDERER_SOURCE__", { configurable: false, enumerable: false, writable: false, value: ${JSON.stringify(rendererSource)} });\n`;
+  const themeConfig = `Object.defineProperty(globalThis, "__PI_SHARE_VIEWER_THEME__", { configurable: false, enumerable: false, writable: false, value: ${JSON.stringify(theme)} });\n`;
   runtime.textContent = escapeInlineScript(
-    `${rendererConfig}${enhancerSource}`,
+    `${rendererConfig}${themeConfig}${enhancerSource}`,
   );
 
   document.head.prepend(policy, baseUrl);

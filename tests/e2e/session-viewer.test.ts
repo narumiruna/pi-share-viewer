@@ -251,6 +251,20 @@ test("loads a real Pi export and enhances Mermaid diagrams", async ({
     fullPage: true,
   });
 
+  await frame.getByRole("button", { name: "Switch to light theme" }).click();
+  await expect(frame.locator("html")).toHaveAttribute(
+    "data-pi-mermaid-theme",
+    "light",
+  );
+  await expect(
+    frame.getByRole("button", { name: "Switch to dark theme" }),
+  ).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(() => localStorage.getItem("pi-share-viewer-theme")),
+    )
+    .toBe("light");
+
   const iframe = page.locator("#preview");
   await expect(iframe).toHaveAttribute("sandbox", "allow-scripts");
   await expect(iframe).toHaveAttribute("allow", "fullscreen");

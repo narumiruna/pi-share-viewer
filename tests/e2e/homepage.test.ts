@@ -31,6 +31,12 @@ for (const viewport of viewports) {
       "#features",
     );
     await expect(
+      page.getByRole("link", { name: "View Pi Share Viewer on GitHub" }),
+    ).toHaveAttribute("href", "https://github.com/narumiruna/pi-share-viewer");
+    await expect(
+      page.getByRole("button", { name: /Switch to (dark|light) theme/ }),
+    ).toBeVisible();
+    await expect(
       page.getByRole("heading", {
         level: 2,
         name: "Setup",
@@ -54,3 +60,58 @@ for (const viewport of viewports) {
     expect(hasHorizontalOverflow).toBe(false);
   });
 }
+
+test("switches themes and preserves the choice", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => {
+    localStorage.setItem("pi-share-viewer-theme", "dark");
+  });
+  await page.reload();
+
+  await expect(page.locator("html")).toHaveClass(/dark/);
+  await page.getByRole("button", { name: "Switch to light theme" }).click();
+  await expect(page.locator("html")).toHaveClass(/light/);
+  await expect(
+    page.getByRole("button", { name: "Switch to dark theme" }),
+  ).toBeVisible();
+
+  await page.reload();
+  await expect(page.locator("html")).toHaveClass(/light/);
+});
+
+test("copies both setup commands with visible feedback", async ({ page }) => {
+  await page.goto("/");
+  await page.locator("body").evaluate(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: () => Promise.reject(new Error("denied")) },
+    });
+    document.execCommand = () => {
+      const testWindow = window as Window & { copiedText?: string };
+      testWindow.copiedText = (
+        document.activeElement as HTMLTextAreaElement
+      ).value;
+      return true;
+    };
+  });
+
+  await page.getByRole("button", { name: "Copy setup command" }).click();
+  await expect(
+    page.getByRole("button", { name: /Copy setup command — copied/ }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => (window as Window & { copiedText?: string }).copiedText,
+    ),
+  ).toBe('export PI_SHARE_VIEWER_URL="http://127.0.0.1:4173/session/"\npi');
+
+  await page.getByRole("button", { name: "Copy share command" }).click();
+  await expect(
+    page.getByRole("button", { name: /Copy share command — copied/ }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => (window as Window & { copiedText?: string }).copiedText,
+    ),
+  ).toBe("/share");
+});

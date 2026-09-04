@@ -1,15 +1,22 @@
+@import "@radix-ui/colors/slate.css";
 @import "@radix-ui/colors/slate-dark.css";
+@import "@radix-ui/colors/teal.css";
 @import "@radix-ui/colors/teal-dark.css";
+@import "@radix-ui/colors/amber.css";
 @import "@radix-ui/colors/amber-dark.css";
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", sans-serif;
   color: var(--slate-12);
   background: var(--slate-1);
   font-synthesis: none;
+}
+
+:root.dark {
+  color-scheme: dark;
 }
 
 * {
@@ -74,7 +81,8 @@ code {
 }
 
 .brand,
-.nav-status {
+.nav-status,
+.icon-action {
   display: inline-flex;
   align-items: center;
   color: var(--slate-11);
@@ -106,6 +114,57 @@ code {
 .brand-mark::after,
 .brand-mark span,
 .status-dot {
+  display: none;
+}
+
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.nav-status {
+  margin-right: 0.35rem;
+}
+
+.icon-action {
+  min-width: 2.25rem;
+  height: 2.25rem;
+  justify-content: center;
+  gap: 0.4rem;
+  border: 1px solid transparent;
+  border-radius: 0.3rem;
+  background: transparent;
+  padding: 0 0.55rem;
+  cursor: pointer;
+}
+
+.icon-action:hover {
+  border-color: var(--slate-6);
+  background: var(--slate-3);
+  color: var(--slate-12);
+}
+
+.icon-action svg {
+  width: 1rem;
+  height: 1rem;
+  fill: currentColor;
+}
+
+.theme-toggle {
+  padding: 0;
+}
+
+.theme-toggle svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.75;
+}
+
+:root.dark .moon-icon,
+:root.light .sun-icon {
   display: none;
 }
 
@@ -181,7 +240,9 @@ code {
 
 .primary-action:focus-visible,
 .secondary-action:focus-visible,
-.brand:focus-visible {
+.brand:focus-visible,
+.icon-action:focus-visible,
+.copy-button:focus-visible {
   outline: 2px solid var(--teal-11);
   outline-offset: 2px;
 }
@@ -400,6 +461,50 @@ code {
   font-size: 0.9rem;
 }
 
+.setup-card-header {
+  display: flex;
+  min-height: 1.75rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.copy-button {
+  display: inline-flex;
+  min-height: 1.75rem;
+  align-items: center;
+  gap: 0.3rem;
+  border: 1px solid var(--slate-6);
+  border-radius: 0.25rem;
+  background: transparent;
+  padding: 0.25rem 0.45rem;
+  color: var(--slate-10);
+  font-size: 0.68rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.copy-button:hover {
+  border-color: var(--slate-8);
+  background: var(--slate-3);
+  color: var(--slate-12);
+}
+
+.copy-button[data-copied="true"] {
+  border-color: var(--teal-7);
+  color: var(--teal-11);
+}
+
+.copy-button svg {
+  width: 0.8rem;
+  height: 0.8rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.75;
+}
+
 .feature-grid p {
   margin: 0.35rem 0 0;
   color: var(--slate-10);
@@ -541,6 +646,15 @@ code {
 
   .landing-main {
     padding: 2.5rem 0;
+  }
+
+  .nav-status,
+  .github-action span {
+    display: none;
+  }
+
+  .github-action {
+    padding: 0;
   }
 
   .hero h1 {

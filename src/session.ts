@@ -1,6 +1,12 @@
 import { loadSessionHtml } from "./gist.js";
 import { parseGistId } from "./hash.js";
 import { injectMermaidEnhancer } from "./inject.js";
+import {
+  applyTheme,
+  getPreferredTheme,
+  getSavedTheme,
+  saveTheme,
+} from "./theme.js";
 import { renderError } from "./ui.js";
 
 const LOAD_TIMEOUT_MS = 30_000;
@@ -60,6 +66,7 @@ export async function loadViewer(): Promise<void> {
       rendererSource,
       gistId,
       window.location.origin,
+      getSavedTheme(),
     );
     loading.hidden = true;
     frame.hidden = false;
@@ -76,6 +83,23 @@ export async function loadViewer(): Promise<void> {
     if (activeController === controller) activeController = undefined;
   }
 }
+
+applyTheme(getPreferredTheme());
+
+window.addEventListener("message", (event: MessageEvent) => {
+  const frame = requiredElement<HTMLIFrameElement>("preview");
+  if (event.source !== frame.contentWindow) return;
+
+  const data = event.data as { theme?: unknown; type?: unknown } | null;
+  if (
+    data?.type !== "pi-share-viewer-theme" ||
+    (data.theme !== "dark" && data.theme !== "light")
+  ) {
+    return;
+  }
+
+  saveTheme(data.theme);
+});
 
 window.addEventListener("DOMContentLoaded", () => {
   void loadViewer();

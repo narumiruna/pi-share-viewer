@@ -87,6 +87,9 @@ style.textContent = `
 .pi-mermaid-source[hidden], .pi-mermaid-viewport[hidden] { display: none; }
 .pi-mermaid-renderer-frame { position: fixed; z-index: -1; top: 0; left: 0; width: 1024px; height: 768px; border: 0; opacity: 0; pointer-events: none; }
 .pi-mermaid-error { padding: 1rem; color: #ef4444; font: 500 .85rem/1.5 ui-monospace, monospace; }
+.pi-session-theme-toggle { display: grid; position: fixed; z-index: 2147483646; top: 12px; right: 12px; width: 36px; height: 36px; place-items: center; border: 1px solid var(--borderMuted); border-radius: 4px; background: var(--container-bg); color: var(--text); padding: 0; font: 600 16px/1 ui-sans-serif, system-ui, sans-serif; cursor: pointer; }
+.pi-session-theme-toggle:hover { background: var(--selectedBg); }
+.pi-session-theme-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .pi-mermaid-card:fullscreen, .pi-mermaid-card.pi-mermaid-expanded { display: flex; position: fixed; inset: 0; z-index: 2147483647; width: 100vw; height: 100vh; margin: 0; border: 0; border-radius: 0; flex-direction: column; background: var(--pi-diagram-panel); color: var(--pi-diagram-text); }
 .pi-mermaid-card:fullscreen .pi-mermaid-viewport, .pi-mermaid-card.pi-mermaid-expanded .pi-mermaid-viewport { max-height: none; flex: 1; }
 @media (prefers-reduced-motion: reduce) { .pi-mermaid-tracing .pi-mermaid-polished [data-pi-edge="true"] { animation: none; } }
@@ -94,12 +97,39 @@ style.textContent = `
 `;
 document.head.append(style);
 
+const configuredTheme = (
+  globalThis as typeof globalThis & {
+    __PI_SHARE_VIEWER_THEME__?: unknown;
+  }
+).__PI_SHARE_VIEWER_THEME__;
 const backgroundColor = getComputedStyle(document.body).backgroundColor;
-const isDarkTheme = isDarkColor(backgroundColor);
+let isDarkTheme =
+  configuredTheme === "dark" || configuredTheme === "light"
+    ? configuredTheme === "dark"
+    : isDarkColor(backgroundColor);
 document.documentElement.dataset.piMermaidTheme = isDarkTheme
   ? "dark"
   : "light";
 installSessionStyle();
+
+const themeToggle = document.createElement("button");
+themeToggle.className = "pi-session-theme-toggle";
+themeToggle.type = "button";
+function updateThemeToggle(): void {
+  const nextTheme = isDarkTheme ? "light" : "dark";
+  themeToggle.textContent = isDarkTheme ? "☀" : "☾";
+  themeToggle.setAttribute("aria-label", `Switch to ${nextTheme} theme`);
+  themeToggle.title = `Switch to ${nextTheme} theme`;
+}
+updateThemeToggle();
+themeToggle.addEventListener("click", () => {
+  isDarkTheme = !isDarkTheme;
+  const theme = isDarkTheme ? "dark" : "light";
+  document.documentElement.dataset.piMermaidTheme = theme;
+  updateThemeToggle();
+  window.parent.postMessage({ type: "pi-share-viewer-theme", theme }, "*");
+});
+document.body.append(themeToggle);
 
 interface ViewState {
   fitScale: number;

@@ -18,6 +18,7 @@ describe("session enhancement injection", () => {
       "globalThis.rendererLoaded = true;",
       GIST_ID,
       "https://pi.narumi.dev",
+      "light",
     );
 
     expect(output.indexOf("Content-Security-Policy")).toBeLessThan(
@@ -26,6 +27,8 @@ describe("session enhancement injection", () => {
     expect(output).toContain("connect-src 'none'");
     expect(output).toContain("frame-src blob:");
     expect(output).toContain("__PI_MERMAID_RENDERER_SOURCE__");
+    expect(output).toContain("__PI_SHARE_VIEWER_THEME__");
+    expect(output).toContain('value: "light"');
     expect(output).toContain("globalThis.rendererLoaded = true;");
     expect(output).toContain(`https://pi.narumi.dev/session/#${GIST_ID}`);
     expect(output).toContain("<\\/script><script>bad()<\\/script>");
