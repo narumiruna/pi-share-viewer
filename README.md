@@ -1,6 +1,6 @@
 # pi-share-viewer
 
-`pi-share-viewer` is a self-hosted viewer for Pi session Gists. It keeps Pi's standard exported session UI and enhances Mermaid fences with pan, zoom, fit, fullscreen, source, and copy controls.
+`pi-share-viewer` is a self-hosted viewer for Pi session Gists. It keeps Pi's standard exported session UI and converts Mermaid fences into polished, interactive diagrams with pan, zoom, fit, optional edge tracing, fullscreen, source, and copy controls.
 
 No Pi extension is required. Pi's built-in `/share` already creates `session.html`; `PI_SHARE_VIEWER_URL` changes the URL returned for its GitHub Gist fallback.
 
@@ -16,10 +16,18 @@ flowchart LR
     URL --> W[Static viewer]
     W -->|GitHub Gist API| G
     W --> I[Sandboxed Pi session]
-    I --> M[Interactive Mermaid SVG]
+    I --> M[Bundled Mermaid parser and layout]
+    M --> D[Browser-only semantic decorator]
+    D --> SVG[Polished interactive SVG]
 ```
 
 Pi `0.85.0` is the verified baseline. Its exported DOM does not retain a `language-mermaid` class, so the viewer reads the original fenced sources from `#session-data` and matches them to rendered code blocks.
+
+### Browser-only diagram polish
+
+Diagram conversion runs entirely inside the sandboxed browser iframe. Mermaid remains the syntax and layout engine; a local semantic decorator adds an Archify-inspired signal-flow surface, stable node colors, high-contrast edges, diagram-type labels, and opt-in trace motion. No diagram source is sent to a rendering API, and unsupported SVG details fall back to Mermaid's normal output instead of failing the session.
+
+The progressive decorator is verified for `flowchart`, `sequenceDiagram`, and `stateDiagram-v2`. Other Mermaid diagram types still render with the bundled Mermaid theme and existing viewer controls.
 
 ## Configure Pi
 
@@ -88,7 +96,7 @@ The viewer treats every Gist as untrusted:
 - Remote errors are written with `textContent`, never inserted into the parent page as HTML.
 - The session runs in an iframe with `allow-scripts allow-downloads`, without `allow-same-origin`, forms, popups, or top navigation.
 - Separate parent and child Content Security Policies prevent the session from making network requests or loading external images. The parent permits inline script and style only because `srcdoc` inherits its policy; remote values never enter the parent as HTML.
-- Mermaid is bundled locally and uses `securityLevel: "strict"`.
+- Mermaid and the visual decorator are bundled locally, make no rendering-service requests, and use `securityLevel: "strict"`.
 - A broken or oversized diagram keeps its source visible and does not stop the rest of the session.
 
 The parent page calls GitHub's unauthenticated Gist API directly. GitHub can rate-limit requests by IP; the viewer reports 403 and 429 responses without embedding a GitHub token. A server-side proxy or OAuth flow is intentionally out of scope.
@@ -183,7 +191,7 @@ Browser support:
 ## Project layout
 
 ```text
-src/                       Gist loader and Mermaid enhancement runtime
+src/                       Gist loader, Mermaid runtime, and SVG decorator
 session/                   Session viewer HTML entry
 index.html                 Landing page
 Dockerfile                 Multi-stage production image

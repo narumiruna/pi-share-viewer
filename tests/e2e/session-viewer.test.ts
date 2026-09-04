@@ -106,6 +106,17 @@ test("loads a real Pi export and enhances Mermaid diagrams", async ({
   ).toBeVisible();
   await expect(frame.locator(".pi-mermaid-card")).toHaveCount(1);
   await expect(frame.locator(".pi-mermaid-card svg")).toBeVisible();
+  const polishedCard = frame.locator(".pi-mermaid-card");
+  await expect(polishedCard).toHaveAttribute(
+    "data-pi-mermaid-kind",
+    "flowchart",
+  );
+  await expect(polishedCard.locator("svg")).toHaveClass(/pi-mermaid-polished/);
+  await expect(polishedCard.locator("g[data-pi-tone]")).toHaveCount(2);
+  await expect(polishedCard.locator("[data-pi-edge=true]")).toHaveCount(1);
+  await expect(
+    polishedCard.getByText("flowchart · browser rendered", { exact: true }),
+  ).toBeVisible();
   await expect(frame.locator(".pi-mermaid-error")).toContainText(
     "Unable to render Mermaid",
   );
@@ -119,6 +130,14 @@ test("loads a real Pi export and enhances Mermaid diagrams", async ({
   );
 
   const card = frame.locator(".pi-mermaid-card");
+  const traceButton = card.getByRole("button", { name: "Trace" });
+  await expect(traceButton).toHaveAttribute("aria-pressed", "false");
+  await traceButton.click();
+  await expect(traceButton).toHaveAttribute("aria-pressed", "true");
+  await expect(card).toHaveClass(/pi-mermaid-tracing/);
+  await traceButton.click();
+  await expect(traceButton).toHaveAttribute("aria-pressed", "false");
+
   await card.getByRole("button", { name: "Source" }).click();
   await expect(card.locator(".pi-mermaid-source")).toBeVisible();
   await expect(card.locator(".pi-mermaid-source")).toContainText(
@@ -240,6 +259,7 @@ test("renders safely at mobile and desktop sizes in dark and light sessions", as
       "+",
       "Fit",
       "Reset",
+      "Trace",
       "Source",
       "Copy",
       "Fullscreen",
@@ -262,6 +282,52 @@ test("renders safely at mobile and desktop sizes in dark and light sessions", as
       path: `test-results/${viewport.name}-light.png`,
       fullPage: true,
     });
+  }
+});
+
+test("polishes flowchart, sequence, and state diagrams in the browser", async ({
+  page,
+}) => {
+  const sourceHtml = await createExportFixture();
+  const html = replaceSessionText(
+    sourceHtml,
+    "A normal Markdown paragraph.",
+    `A normal Markdown paragraph.
+
+\`\`\`mermaid
+sequenceDiagram
+  Browser->>API: Request
+  API-->>Browser: Response
+\`\`\`
+
+\`\`\`mermaid
+stateDiagram-v2
+  [*] --> Ready
+  Ready --> Done: run
+  Done --> [*]
+\`\`\``,
+  );
+  await mockGist(page, html);
+  await page.goto(`/session/#${DARK_GIST_ID}`);
+
+  const frame = page.frameLocator("#preview");
+  await expect(frame.locator(".pi-mermaid-card")).toHaveCount(3);
+  for (const kind of ["flowchart", "sequence", "state"]) {
+    const card = frame.locator(`[data-pi-mermaid-kind="${kind}"]`);
+    await expect(card).toHaveCount(1);
+    await expect(card.locator("svg.pi-mermaid-polished")).toBeVisible();
+    expect(await card.locator("[data-pi-tone]").count()).toBeGreaterThan(0);
+    expect(await card.locator("[data-pi-edge=true]").count()).toBeGreaterThan(
+      0,
+    );
+    const viewportBox = await card
+      .locator(".pi-mermaid-viewport")
+      .boundingBox();
+    const svgBox = await card.locator("svg").boundingBox();
+    if (!viewportBox || !svgBox) throw new Error(`${kind} is not visible`);
+    expect(svgBox.width).toBeLessThanOrEqual(viewportBox.width);
+    expect(svgBox.height).toBeLessThanOrEqual(viewportBox.height);
+    await card.screenshot({ path: `test-results/${kind}-dark.png` });
   }
 });
 
