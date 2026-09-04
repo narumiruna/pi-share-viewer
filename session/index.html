@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.github.com https://gist.githubusercontent.com; frame-src 'self' blob:; base-uri 'none'; form-action 'none'"
+    >
+    <title>Session Preview · pi-share-viewer</title>
+    <link rel="stylesheet" href="/src/site.css">
+  </head>
+  <body class="viewer-page">
+    <main id="loading" class="state-panel" aria-live="polite">
+      <span class="spinner" aria-hidden="true"></span>
+      <p>Loading Pi session…</p>
+    </main>
+
+    <main id="error" class="state-panel" hidden>
+      <section class="error-card">
+        <p class="eyebrow">Unable to load</p>
+        <h1>Session unavailable</h1>
+        <p id="error-message"></p>
+        <a href="/">Back to pi-share-viewer</a>
+      </section>
+    </main>
+
+    <iframe
+      id="preview"
+      class="preview-frame"
+      title="Pi session preview"
+      sandbox="allow-scripts"
+      allow="fullscreen"
+      allowfullscreen
+      hidden
+    ></iframe>
+
+    <script type="module" src="/src/session.ts"></script>
+  </body>
+</html>

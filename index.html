@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'"
+    >
+    <meta
+      name="description"
+      content="A self-hosted reader for complete Pi sessions with polished, browser-rendered Mermaid diagrams."
+    >
+    <title>Pi Share Viewer · Better shared sessions</title>
+    <link rel="stylesheet" href="/src/site.css">
+  </head>
+  <body class="landing-page">
+    <div class="landing-glow" aria-hidden="true"></div>
+
+    <header class="landing-nav">
+      <a class="brand" href="/" aria-label="Pi Share Viewer home">
+        <span class="brand-mark" aria-hidden="true"><span></span></span>
+        <span>Pi Share Viewer</span>
+      </a>
+      <span class="nav-status">
+        <span class="status-dot" aria-hidden="true"></span>
+        Self-hosted<span class="nav-detail"> · Browser-rendered</span>
+      </span>
+    </header>
+
+    <main class="landing-main">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow">A clearer way to share Pi sessions</p>
+          <h1 id="hero-title">Make every shared session easier to follow.</h1>
+          <p class="hero-lead">
+            A self-hosted reader for Pi’s built-in <code>/share</code>. It preserves the full
+            conversation, upgrades Mermaid diagrams, and keeps diagram rendering inside the
+            browser.
+          </p>
+          <div class="hero-actions">
+            <a class="primary-action" href="#setup">Connect Pi</a>
+            <a class="secondary-action" href="#features">See what changes</a>
+          </div>
+          <ul class="trust-list" aria-label="Viewer benefits">
+            <li>No Pi extension</li>
+            <li>No rendering service</li>
+            <li>Source always available</li>
+          </ul>
+        </div>
+
+        <div
+          class="product-preview"
+          role="img"
+          aria-label="Preview of a polished shared Pi session"
+        >
+          <div class="preview-topbar">
+            <div class="preview-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+            <span id="preview-origin">your-viewer.example/session</span>
+            <span class="preview-live"><span></span>Live</span>
+          </div>
+          <div class="preview-layout">
+            <div class="preview-sidebar" aria-hidden="true">
+              <div class="preview-search"></div>
+              <div class="preview-filter-row"><span></span><span></span><span></span></div>
+              <div class="preview-tree active"></div>
+              <div class="preview-tree short"></div>
+              <div class="preview-tree"></div>
+            </div>
+            <div class="preview-session">
+              <div class="preview-session-header">
+                <span class="preview-pulse"></span>
+                <span>Architecture review</span>
+              </div>
+              <div class="preview-message">
+                <span class="preview-label">FLOWCHART · BROWSER RENDERED</span>
+                <div class="preview-diagram">
+                  <div class="preview-node cyan">Pi</div>
+                  <span class="preview-arrow" aria-hidden="true"></span>
+                  <div class="preview-node violet">Viewer</div>
+                  <span class="preview-arrow" aria-hidden="true"></span>
+                  <div class="preview-node amber">Session</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="setup" class="setup-section" aria-labelledby="setup-title">
+        <div class="section-heading">
+          <p class="eyebrow">Two-step setup</p>
+          <h2 id="setup-title">Use Pi’s existing share flow.</h2>
+          <p>Set the viewer URL before starting Pi. Then share as usual.</p>
+        </div>
+
+        <div class="setup-grid">
+          <article class="setup-card">
+            <span class="step-number">01</span>
+            <div>
+              <h3>Point Pi at this viewer</h3>
+              <p>Set the environment variable before launching Pi.</p>
+              <pre><code id="setup-command">export PI_SHARE_VIEWER_URL="https://your-viewer.example/session/"
+pi</code></pre>
+            </div>
+          </article>
+          <article class="setup-card">
+            <span class="step-number">02</span>
+            <div>
+              <h3>Share from your session</h3>
+              <p>Run the built-in command. Pi returns a viewer URL for the generated Gist.</p>
+              <pre><code>/share</code></pre>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="features" class="feature-grid" aria-label="Viewer features">
+        <article>
+          <span class="feature-icon diagram-icon" aria-hidden="true"></span>
+          <h3>Polished diagrams</h3>
+          <p>Semantic colors, fit, pan, zoom, trace, fullscreen, and source controls.</p>
+        </article>
+        <article>
+          <span class="feature-icon browser-icon" aria-hidden="true"></span>
+          <h3>Local diagram rendering</h3>
+          <p>Bundled Mermaid runs inside a restricted iframe—not on an external rendering API.</p>
+        </article>
+        <article>
+          <span class="feature-icon session-icon" aria-hidden="true"></span>
+          <h3>The complete session</h3>
+          <p>Messages, tools, branches, metadata, search, and source remain available.</p>
+        </article>
+      </section>
+
+      <aside class="privacy-notice">
+        <span class="privacy-icon" aria-hidden="true">!</span>
+        <div>
+          <strong>Review before sharing.</strong>
+          <p>
+            GitHub secret Gists are unlisted, not private. Anyone with the link can read the
+            complete session.
+          </p>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="landing-footer">
+      <span>Pi Share Viewer</span>
+      <span>Static, self-hosted, and open source.</span>
+    </footer>
+
+    <script type="module" src="/src/home.ts"></script>
+  </body>
+</html>
