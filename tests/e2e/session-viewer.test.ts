@@ -251,11 +251,29 @@ test("loads a real Pi export and enhances Mermaid diagrams", async ({
     fullPage: true,
   });
 
+  await expect(card).toHaveAttribute("data-pi-mermaid-render-theme", "dark");
+  const diagramSvg = card.locator(".pi-mermaid-stage > svg");
+  const darkSvg = await diagramSvg.evaluate((svg) => svg.outerHTML);
   await frame.getByRole("button", { name: "Switch to light theme" }).click();
   await expect(frame.locator("html")).toHaveAttribute(
     "data-pi-mermaid-theme",
     "light",
   );
+  await expect(card).toHaveAttribute("data-pi-mermaid-render-theme", "light");
+  expect(await diagramSvg.evaluate((svg) => svg.outerHTML)).not.toBe(darkSvg);
+  expect(
+    await frame.locator("html").evaluate((html) => ({
+      customMessageLabel: getComputedStyle(html)
+        .getPropertyValue("--customMessageLabel")
+        .trim(),
+      customMessageText: getComputedStyle(html)
+        .getPropertyValue("--customMessageText")
+        .trim(),
+    })),
+  ).toEqual({
+    customMessageLabel: "#6550b9",
+    customMessageText: "#1c2024",
+  });
   await expect(
     frame.getByRole("button", { name: "Switch to dark theme" }),
   ).toBeVisible();

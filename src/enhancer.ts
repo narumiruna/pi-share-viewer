@@ -89,6 +89,7 @@ style.textContent = `
 .pi-mermaid-error { padding: 1rem; color: #ef4444; font: 500 .85rem/1.5 ui-monospace, monospace; }
 .pi-session-theme-toggle { display: grid; position: fixed; z-index: 2147483646; top: 12px; right: 12px; width: 36px; height: 36px; place-items: center; border: 1px solid var(--borderMuted); border-radius: 4px; background: var(--container-bg); color: var(--text); padding: 0; font: 600 16px/1 ui-sans-serif, system-ui, sans-serif; cursor: pointer; }
 .pi-session-theme-toggle:hover { background: var(--selectedBg); }
+.pi-session-theme-toggle:disabled { opacity: .65; cursor: wait; }
 .pi-session-theme-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .pi-mermaid-card:fullscreen, .pi-mermaid-card.pi-mermaid-expanded { display: flex; position: fixed; inset: 0; z-index: 2147483647; width: 100vw; height: 100vh; margin: 0; border: 0; border-radius: 0; flex-direction: column; background: var(--pi-diagram-panel); color: var(--pi-diagram-text); }
 .pi-mermaid-card:fullscreen .pi-mermaid-viewport, .pi-mermaid-card.pi-mermaid-expanded .pi-mermaid-viewport { max-height: none; flex: 1; }
@@ -127,7 +128,15 @@ themeToggle.addEventListener("click", () => {
   const theme = isDarkTheme ? "dark" : "light";
   document.documentElement.dataset.piMermaidTheme = theme;
   updateThemeToggle();
+  themeToggle.disabled = true;
+  themeToggle.setAttribute("aria-busy", "true");
   window.parent.postMessage({ type: "pi-share-viewer-theme", theme }, "*");
+
+  renderQueue = renderQueue.then(() => rerenderDiagrams(isDarkTheme));
+  void renderQueue.then(() => {
+    themeToggle.disabled = false;
+    themeToggle.removeAttribute("aria-busy");
+  });
 });
 document.body.append(themeToggle);
 
@@ -138,6 +147,15 @@ interface ViewState {
   y: number;
 }
 
+interface DiagramView {
+  source: string;
+  stage: HTMLElement;
+  state: ViewState;
+  svg: SVGSVGElement;
+  toolbarBrand: HTMLElement;
+  viewport: HTMLElement;
+}
+
 const rendererSource = (
   globalThis as typeof globalThis & {
     __PI_MERMAID_RENDERER_SOURCE__?: unknown;
@@ -145,6 +163,7 @@ const rendererSource = (
 ).__PI_MERMAID_RENDERER_SOURCE__;
 const sessionCodeBlocks = readSessionCodeBlocks();
 const entryBlockPositions = new WeakMap<HTMLElement, number>();
+const diagramViews = new WeakMap<HTMLElement, DiagramView>();
 let renderedCount = 0;
 let renderSequence = 0;
 let scanQueued = false;
@@ -259,6 +278,7 @@ function showRenderError(pre: HTMLPreElement, message: string): void {
 }
 
 interface RenderedDiagram {
+  dark: boolean;
   diagramType: string;
   svg: string;
 }
@@ -267,7 +287,10 @@ function escapeInlineScript(source: string): string {
   return source.replace(/<\/script/gi, "<\\/script");
 }
 
-function renderMermaidInSandbox(source: string): Promise<RenderedDiagram> {
+function renderMermaidInSandbox(
+  source: string,
+  dark = isDarkTheme,
+): Promise<RenderedDiagram> {
   if (typeof rendererSource !== "string") {
     return Promise.reject(
       new Error("Mermaid renderer runtime is unavailable."),
@@ -313,7 +336,7 @@ function renderMermaidInSandbox(source: string): Promise<RenderedDiagram> {
         reject(new Error("Rendered diagram is too large to display safely."));
         return;
       }
-      resolve({ diagramType: result.diagramType, svg: result.svg });
+      resolve({ dark, diagramType: result.diagramType, svg: result.svg });
     };
     const timer = window.setTimeout(() => {
       cleanup();
@@ -330,7 +353,7 @@ function renderMermaidInSandbox(source: string): Promise<RenderedDiagram> {
             type: MERMAID_RENDER_REQUEST,
             requestId,
             source,
-            dark: isDarkTheme,
+            dark,
           },
           "*",
         );
@@ -339,6 +362,40 @@ function renderMermaidInSandbox(source: string): Promise<RenderedDiagram> {
     );
     document.body.append(frame);
   });
+}
+
+async function rerenderDiagrams(dark: boolean): Promise<void> {
+  const cards = document.querySelectorAll<HTMLElement>(".pi-mermaid-card");
+  for (const card of cards) {
+    const view = diagramViews.get(card);
+    if (!view) continue;
+
+    try {
+      const rendered = await renderMermaidInSandbox(view.source, dark);
+      const nextStage = document.createElement("div");
+      nextStage.innerHTML = rendered.svg;
+      const nextSvg = nextStage.querySelector("svg");
+      if (!(nextSvg instanceof SVGSVGElement)) {
+        throw new Error("Mermaid did not produce an SVG diagram.");
+      }
+
+      for (const attribute of Array.from(view.svg.attributes)) {
+        view.svg.removeAttribute(attribute.name);
+      }
+      for (const attribute of Array.from(nextSvg.attributes)) {
+        view.svg.setAttribute(attribute.name, attribute.value);
+      }
+      view.svg.replaceChildren(...Array.from(nextSvg.childNodes));
+
+      const decoration = decorateMermaidSvg(view.svg, rendered.diagramType);
+      card.dataset.piMermaidKind = decoration.kind;
+      card.dataset.piMermaidRenderTheme = rendered.dark ? "dark" : "light";
+      view.toolbarBrand.textContent = decoration.kind;
+      fitToViewport(view.viewport, view.stage, view.svg, view.state);
+    } catch {
+      card.dataset.piMermaidRenderTheme = "error";
+    }
+  }
 }
 
 async function enhanceCode(code: HTMLElement): Promise<void> {
@@ -367,6 +424,7 @@ async function enhanceCode(code: HTMLElement): Promise<void> {
     const card = document.createElement("section");
     card.className = "pi-mermaid-card";
     card.dataset.piMermaidState = "rendered";
+    card.dataset.piMermaidRenderTheme = rendered.dark ? "dark" : "light";
 
     const toolbar = document.createElement("div");
     toolbar.className = "pi-mermaid-toolbar";
@@ -401,6 +459,14 @@ async function enhanceCode(code: HTMLElement): Promise<void> {
     pre.replaceWith(card);
 
     const state: ViewState = { fitScale: 1, scale: 1, x: 0, y: 0 };
+    diagramViews.set(card, {
+      source,
+      stage,
+      state,
+      svg,
+      toolbarBrand,
+      viewport,
+    });
     fitToViewport(viewport, stage, svg, state);
     installPanZoom(viewport, stage, state);
     mountDiagramToolbar(controls, {

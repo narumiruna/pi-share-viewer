@@ -11,6 +11,7 @@ for (const viewport of viewports) {
   }) => {
     await page.setViewportSize(viewport);
     await page.goto("/");
+    const sessionUrl = new URL("/session/", page.url());
 
     await expect(page).toHaveTitle("Pi Share Viewer");
     await expect(
@@ -43,10 +44,10 @@ for (const viewport of viewports) {
       }),
     ).toBeVisible();
     await expect(page.getByText("PI_SHARE_VIEWER_URL")).toContainText(
-      'export PI_SHARE_VIEWER_URL="http://127.0.0.1:4173/session/"',
+      `export PI_SHARE_VIEWER_URL="${sessionUrl.href}"`,
     );
     await expect(page.locator("#preview-origin")).toHaveText(
-      "127.0.0.1:4173/session/",
+      `${sessionUrl.host}${sessionUrl.pathname}`,
     );
     await expect(
       page.getByText("Secret Gists are unlisted, not private."),
@@ -81,6 +82,7 @@ test("switches themes and preserves the choice", async ({ page }) => {
 
 test("copies both setup commands with visible feedback", async ({ page }) => {
   await page.goto("/");
+  const sessionUrl = new URL("/session/", page.url());
   await page.locator("body").evaluate(() => {
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
@@ -103,7 +105,7 @@ test("copies both setup commands with visible feedback", async ({ page }) => {
     await page.evaluate(
       () => (window as Window & { copiedText?: string }).copiedText,
     ),
-  ).toBe('export PI_SHARE_VIEWER_URL="http://127.0.0.1:4173/session/"\npi');
+  ).toBe(`export PI_SHARE_VIEWER_URL="${sessionUrl.href}"\npi`);
 
   await page.getByRole("button", { name: "Copy share command" }).click();
   await expect(

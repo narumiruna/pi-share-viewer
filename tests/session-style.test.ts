@@ -18,6 +18,10 @@ describe("installSessionStyle", () => {
     expect(document.documentElement.dataset.piSessionUi).toBe("radix");
     expect(style?.textContent).toContain("--body-bg: #111113");
     expect(style?.textContent).toContain("--accent: #0bd8b6");
+    expect(style?.textContent).toContain("--customMessageText: #edeef0");
+    expect(style?.textContent).toContain("--customMessageLabel: #baa7ff");
+    expect(style?.textContent).toContain("--customMessageText: #1c2024");
+    expect(style?.textContent).toContain("--customMessageLabel: #6550b9");
     expect(style?.textContent).toContain(
       '[data-pi-session-ui="radix"] #sidebar',
     );
