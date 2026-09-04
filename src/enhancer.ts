@@ -44,21 +44,17 @@ style.textContent = `
   --pi-diagram-edge: #6f8fa4;
   --pi-diagram-mask: #fff;
 }
-.pi-mermaid-card { position: relative; margin: 1.25rem 0; overflow: hidden; border: 1px solid var(--pi-diagram-border); border-radius: 1rem; background: var(--pi-diagram-panel); box-shadow: 0 1.4rem 4rem rgb(0 0 0 / 22%), inset 0 1px rgb(255 255 255 / 5%); color: var(--pi-diagram-text); }
-.pi-mermaid-toolbar { display: flex; flex-wrap: wrap; gap: .6rem 1rem; align-items: center; justify-content: space-between; min-height: 3.2rem; padding: .55rem .7rem; border-bottom: 1px solid var(--pi-diagram-border); background: var(--pi-diagram-panel-soft); backdrop-filter: blur(16px); }
-.pi-mermaid-toolbar-brand { display: inline-flex; align-items: center; gap: .5rem; color: var(--pi-diagram-muted); font: 700 .65rem/1 ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .12em; text-transform: uppercase; }
-.pi-mermaid-toolbar-brand::before { width: .5rem; height: .5rem; border-radius: 50%; background: #2dd4bf; box-shadow: 0 0 .8rem #2dd4bf; content: ""; }
-.pi-mermaid-controls { display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; }
-.pi-mermaid-toolbar button { display: inline-grid; width: 2.1rem; min-width: 2.1rem; height: 2.1rem; min-height: 2.1rem; place-items: center; border: 1px solid color-mix(in srgb, var(--pi-diagram-border) 84%, transparent); border-radius: .5rem; background: color-mix(in srgb, var(--pi-diagram-panel-soft) 88%, transparent); color: var(--pi-diagram-text); padding: 0; cursor: pointer; transition: border-color .16s ease, background .16s ease, color .16s ease, transform .16s ease; }
-.pi-mermaid-toolbar button svg { width: 1rem; height: 1rem; }
-.pi-mermaid-toolbar button:hover { border-color: #2dd4bf; background: color-mix(in srgb, #2dd4bf 10%, var(--pi-diagram-panel)); transform: translateY(-1px); }
-.pi-mermaid-toolbar button:focus-visible { outline: 2px solid #2dd4bf; outline-offset: 2px; }
-.pi-mermaid-toolbar button[aria-pressed="true"], .pi-mermaid-toolbar button[data-state="on"] { border-color: #2dd4bf; background: color-mix(in srgb, #2dd4bf 12%, var(--pi-diagram-panel)); color: #2dd4bf; }
-.pi-mermaid-toolbar-separator { width: 1px; height: 1.25rem; margin: 0 .12rem; background: var(--pi-diagram-border); }
-.pi-mermaid-tooltip { z-index: 2147483647; border: 1px solid var(--pi-diagram-border); border-radius: .45rem; background: var(--pi-diagram-panel); color: var(--pi-diagram-text); padding: .4rem .55rem; box-shadow: 0 .6rem 1.8rem rgb(0 0 0 / 30%); font: 600 .68rem/1 ui-monospace, SFMono-Regular, Consolas, monospace; animation: pi-mermaid-tooltip-in .12s ease-out; }
-.pi-mermaid-tooltip-arrow { fill: var(--pi-diagram-border); }
-@keyframes pi-mermaid-tooltip-in { from { opacity: 0; transform: translateY(-2px); } }
-.pi-mermaid-viewport { min-height: 19rem; max-height: 75vh; overflow: hidden; padding: clamp(.75rem, 2vw, 1.5rem); background-image: radial-gradient(circle at 20% 0%, rgb(34 211 238 / 9%), transparent 24rem), linear-gradient(var(--pi-diagram-grid) 1px, transparent 1px), linear-gradient(90deg, var(--pi-diagram-grid) 1px, transparent 1px); background-size: auto, 28px 28px, 28px 28px; cursor: grab; touch-action: none; }
+.pi-mermaid-card { position: relative; margin: 1rem 0; overflow: hidden; border: 1px solid var(--pi-diagram-border); border-radius: .4rem; background: var(--pi-diagram-panel); color: var(--pi-diagram-text); }
+.pi-mermaid-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; min-height: 2.5rem; padding: .25rem .4rem; border-bottom: 1px solid var(--pi-diagram-border); background: var(--pi-diagram-panel); }
+.pi-mermaid-toolbar-brand { color: var(--pi-diagram-muted); font: 500 .7rem/1 ui-monospace, SFMono-Regular, Consolas, monospace; }
+.pi-mermaid-controls { display: flex; flex-wrap: wrap; gap: .1rem; align-items: center; }
+.pi-mermaid-toolbar button { display: inline-grid; width: 1.9rem; min-width: 1.9rem; height: 1.9rem; min-height: 1.9rem; place-items: center; border: 0; border-radius: .25rem; background: transparent; color: var(--pi-diagram-muted); padding: 0; cursor: pointer; }
+.pi-mermaid-toolbar button svg { width: .95rem; height: .95rem; }
+.pi-mermaid-toolbar button:hover { background: color-mix(in srgb, var(--pi-diagram-border) 35%, transparent); color: var(--pi-diagram-text); }
+.pi-mermaid-toolbar button:focus-visible { outline: 2px solid #2dd4bf; outline-offset: 1px; }
+.pi-mermaid-toolbar button[aria-pressed="true"], .pi-mermaid-toolbar button[data-state="on"] { background: color-mix(in srgb, #2dd4bf 12%, var(--pi-diagram-panel)); color: #2dd4bf; }
+.pi-mermaid-tooltip { z-index: 2147483647; border: 1px solid var(--pi-diagram-border); border-radius: .25rem; background: var(--pi-diagram-panel); color: var(--pi-diagram-text); padding: .35rem .45rem; font: 500 .7rem/1 ui-monospace, SFMono-Regular, Consolas, monospace; }
+.pi-mermaid-viewport { min-height: 19rem; max-height: 75vh; overflow: hidden; padding: 1rem; background: var(--pi-diagram-panel); cursor: grab; touch-action: none; }
 .pi-mermaid-card[data-pi-mermaid-kind="state"] .pi-mermaid-viewport { height: min(42rem, 75vh); }
 .pi-mermaid-viewport:active { cursor: grabbing; }
 .pi-mermaid-stage { width: 100%; margin-inline: auto; transform-origin: 0 0; }
@@ -94,7 +90,7 @@ style.textContent = `
 .pi-mermaid-card:fullscreen, .pi-mermaid-card.pi-mermaid-expanded { display: flex; position: fixed; inset: 0; z-index: 2147483647; width: 100vw; height: 100vh; margin: 0; border: 0; border-radius: 0; flex-direction: column; background: var(--pi-diagram-panel); color: var(--pi-diagram-text); }
 .pi-mermaid-card:fullscreen .pi-mermaid-viewport, .pi-mermaid-card.pi-mermaid-expanded .pi-mermaid-viewport { max-height: none; flex: 1; }
 @media (prefers-reduced-motion: reduce) { .pi-mermaid-tracing .pi-mermaid-polished [data-pi-edge="true"] { animation: none; } }
-@media (max-width: 640px) { .pi-mermaid-viewport { min-height: 15rem; padding: .5rem; } .pi-mermaid-toolbar { align-items: flex-start; } .pi-mermaid-controls { width: 100%; gap: .2rem; } .pi-mermaid-toolbar button { width: 2rem; min-width: 2rem; height: 2rem; min-height: 2rem; padding: 0; } .pi-mermaid-toolbar-separator { margin-inline: 0; } }
+@media (max-width: 640px) { .pi-mermaid-viewport { min-height: 15rem; padding: .5rem; } .pi-mermaid-toolbar { align-items: flex-start; } .pi-mermaid-controls { width: 100%; } .pi-mermaid-toolbar button { width: 2rem; min-width: 2rem; height: 2rem; min-height: 2rem; padding: 0; } }
 `;
 document.head.append(style);
 
@@ -360,7 +356,7 @@ async function enhanceCode(code: HTMLElement): Promise<void> {
     }
     const decoration = decorateMermaidSvg(svg, rendered.diagramType);
     card.dataset.piMermaidKind = decoration.kind;
-    toolbarBrand.textContent = `${decoration.kind} · browser rendered`;
+    toolbarBrand.textContent = decoration.kind;
     viewport.append(stage);
 
     const sourceView = document.createElement("pre");

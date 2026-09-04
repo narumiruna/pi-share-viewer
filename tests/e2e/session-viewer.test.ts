@@ -101,7 +101,7 @@ test("loads a real Pi export and enhances Mermaid diagrams", async ({
   await expect(polishedCard.locator("g[data-pi-tone]")).toHaveCount(2);
   await expect(polishedCard.locator("[data-pi-edge=true]")).toHaveCount(1);
   await expect(
-    polishedCard.getByText("flowchart · browser rendered", { exact: true }),
+    polishedCard.getByText("flowchart", { exact: true }),
   ).toBeVisible();
   await expect(frame.locator(".pi-mermaid-error")).toContainText(
     "Unable to render Mermaid",
