@@ -23,6 +23,11 @@ for (const viewport of viewports) {
     await expect(page.locator(".hero-lead")).toHaveText(
       "A self-hosted viewer for /share.",
     );
+    const sharingPreview = page.getByRole("img", {
+      name: "Example Pi GitHub fallback sharing workflow",
+    });
+    await expect(sharingPreview).toBeVisible();
+    await expect(sharingPreview).toContainText("GitHub fallback");
     await expect(
       page.getByRole("link", { name: "View Pi Share Viewer on GitHub" }),
     ).toHaveAttribute("href", "https://github.com/narumiruna/pi-share-viewer");
