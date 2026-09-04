@@ -1,0 +1,8 @@
+[project]
+targets = ["pi"]
+
+[instructions]
+
+[skills]
+
+[mcp]
