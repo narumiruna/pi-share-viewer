@@ -1,0 +1,142 @@
+:root {
+  color-scheme: dark;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+  background: #09090b;
+  color: #f4f4f5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  background:
+    radial-gradient(circle at 20% 0%, rgb(59 130 246 / 16%), transparent 32rem),
+    #09090b;
+}
+
+code {
+  border: 1px solid #3f3f46;
+  border-radius: 0.35rem;
+  background: #18181b;
+  padding: 0.15rem 0.35rem;
+  font-family: "SFMono-Regular", Consolas, monospace;
+}
+
+.landing-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 100vh;
+  place-items: center;
+  padding: 2rem;
+}
+
+.landing-card,
+.error-card {
+  width: min(100%, 46rem);
+  min-width: 0;
+  border: 1px solid #27272a;
+  border-radius: 1rem;
+  background: rgb(24 24 27 / 88%);
+  padding: clamp(1.5rem, 5vw, 3.5rem);
+  box-shadow: 0 2rem 5rem rgb(0 0 0 / 35%);
+}
+
+h1 {
+  margin: 0 0 1rem;
+  font-size: clamp(2rem, 6vw, 4rem);
+  line-height: 1.05;
+}
+
+p {
+  color: #a1a1aa;
+  font-size: 1.05rem;
+  line-height: 1.7;
+}
+
+.landing-card pre {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.landing-card pre code {
+  display: block;
+  width: max-content;
+  min-width: 100%;
+  padding: 0.75rem;
+}
+
+aside {
+  margin-top: 2rem;
+  border-left: 3px solid #f59e0b;
+  background: rgb(245 158 11 / 8%);
+  padding: 1rem;
+  color: #d4d4d8;
+}
+
+.eyebrow {
+  margin: 0 0 0.75rem;
+  color: #60a5fa;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.viewer-page {
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+.state-panel {
+  display: grid;
+  min-height: 100vh;
+  place-content: center;
+  justify-items: center;
+  padding: 2rem;
+}
+
+.state-panel[hidden],
+.preview-frame[hidden] {
+  display: none;
+}
+
+.spinner {
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 3px solid #27272a;
+  border-top-color: #60a5fa;
+  border-radius: 999px;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.error-card h1 {
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+}
+
+.error-card a {
+  color: #93c5fd;
+}
+
+.preview-frame {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #09090b;
+}

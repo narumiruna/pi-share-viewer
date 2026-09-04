@@ -141,6 +141,10 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+public/assets/mermaid-enhancer.js
+tests/.generated/
+test-results/
+playwright-report/
 
 # aru
 .aru/

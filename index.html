@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'"
+    >
+    <title>pi-share-viewer</title>
+    <link rel="stylesheet" href="/src/site.css">
+  </head>
+  <body class="landing-page">
+    <main class="landing-card">
+      <p class="eyebrow">Pi session viewer</p>
+      <h1>Read complete Mermaid diagrams in shared Pi sessions.</h1>
+      <p>
+        Point Pi's built-in <code>/share</code> command at this viewer with
+        <code>PI_SHARE_VIEWER_URL</code>, then inspect diagrams with pan, zoom, fullscreen, and
+        source controls.
+      </p>
+      <pre><code>export PI_SHARE_VIEWER_URL="https://pi.narumi.dev/session/"</code></pre>
+      <aside>
+        Secret Gists are unlisted, not private. Anyone with the link can read the complete
+        session.
+      </aside>
+    </main>
+  </body>
+</html>
