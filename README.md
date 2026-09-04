@@ -136,7 +136,7 @@ Build and start the static Nginx service:
 docker compose up -d --build
 ```
 
-The default host port is `8080`. Override it with `PORT`:
+The default host port is `18080`. Override it with `PORT`:
 
 ```bash
 PORT=3000 docker compose up -d --build
@@ -145,7 +145,7 @@ PORT=3000 docker compose up -d --build
 Verify and inspect the service:
 
 ```bash
-curl --fail http://localhost:8080/healthz
+curl --fail http://localhost:18080/healthz
 docker compose ps
 docker compose logs viewer
 ```
@@ -162,7 +162,7 @@ Example Caddy configuration:
 
 ```caddyfile
 pi.narumi.dev {
-    reverse_proxy 127.0.0.1:8080
+    reverse_proxy 127.0.0.1:18080
 }
 ```
 

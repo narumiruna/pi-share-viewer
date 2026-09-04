@@ -62,7 +62,7 @@ describe("repository shape", () => {
     );
     expect(dockerfile).toContain("USER 101:101");
     expect(compose).toContain("name: pi-share-viewer");
-    expect(compose).toMatch(/ports:\s+- "\$\{PORT:-8080\}:80"/);
+    expect(compose).toMatch(/ports:\s+- "\$\{PORT:-18080\}:80"/);
     expect(compose).toContain("read_only: true");
     expect(compose).toContain("no-new-privileges:true");
     expect(compose).toContain("cap_drop:\n      - ALL");
