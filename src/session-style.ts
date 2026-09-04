@@ -37,6 +37,8 @@ const SESSION_STYLE = `
   --userMessageBg: color-mix(in srgb, ${slateDark.slate2} 92%, ${tealDark.teal2});
   --userMessageText: ${slateDark.slate12};
   --customMessageBg: ${violetDark.violet2};
+  --customMessageText: ${slateDark.slate12};
+  --customMessageLabel: ${violetDark.violet11};
   --toolPendingBg: ${slateDark.slate3};
   --toolSuccessBg: ${greenDark.green2};
   --toolErrorBg: ${redDark.red2};
@@ -74,6 +76,8 @@ const SESSION_STYLE = `
   --userMessageBg: ${slate.slate1};
   --userMessageText: ${slate.slate12};
   --customMessageBg: ${violet.violet2};
+  --customMessageText: ${slate.slate12};
+  --customMessageLabel: ${violet.violet11};
   --toolPendingBg: ${slate.slate3};
   --toolSuccessBg: ${green.green2};
   --toolErrorBg: ${red.red2};

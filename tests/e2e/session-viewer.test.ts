@@ -179,8 +179,12 @@ test("loads a real Pi export and enhances Mermaid diagrams", async ({
       return true;
     };
   });
-  await card.getByRole("button", { name: "Copy source" }).click();
-  await expect(card.getByRole("button", { name: "Copied" })).toBeVisible();
+  const copySourceButton = card.getByRole("button", { name: "Copy source" });
+  await copySourceButton.focus();
+  await copySourceButton.click();
+  const copiedSourceButton = card.getByRole("button", { name: "Copied" });
+  await expect(copiedSourceButton).toBeVisible();
+  await expect(copiedSourceButton).toBeFocused();
   expect(
     await frame
       .locator("body")
@@ -250,6 +254,44 @@ test("loads a real Pi export and enhances Mermaid diagrams", async ({
     path: "test-results/desktop-dark.png",
     fullPage: true,
   });
+
+  await expect(card).toHaveAttribute("data-pi-mermaid-render-theme", "dark");
+  const diagramSvg = card.locator(".pi-mermaid-stage > svg");
+  const darkSvg = await diagramSvg.evaluate((svg) => svg.outerHTML);
+  await card.getByRole("button", { name: "Show source" }).click();
+  await expect(viewport).toBeHidden();
+  await frame.getByRole("button", { name: "Switch to light theme" }).click();
+  await expect(frame.locator("html")).toHaveAttribute(
+    "data-pi-mermaid-theme",
+    "light",
+  );
+  await expect(card).toHaveAttribute("data-pi-mermaid-render-theme", "light");
+  await expect(card).toHaveAttribute("data-pi-mermaid-needs-fit", "true");
+  expect(await diagramSvg.evaluate((svg) => svg.outerHTML)).not.toBe(darkSvg);
+  await card.getByRole("button", { name: "Show diagram" }).click();
+  await expect(viewport).toBeVisible();
+  await expect(card).not.toHaveAttribute("data-pi-mermaid-needs-fit");
+  expect(
+    await frame.locator("html").evaluate((html) => ({
+      customMessageLabel: getComputedStyle(html)
+        .getPropertyValue("--customMessageLabel")
+        .trim(),
+      customMessageText: getComputedStyle(html)
+        .getPropertyValue("--customMessageText")
+        .trim(),
+    })),
+  ).toEqual({
+    customMessageLabel: "#6550b9",
+    customMessageText: "#1c2024",
+  });
+  await expect(
+    frame.getByRole("button", { name: "Switch to dark theme" }),
+  ).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(() => localStorage.getItem("pi-share-viewer-theme")),
+    )
+    .toBe("light");
 
   const iframe = page.locator("#preview");
   await expect(iframe).toHaveAttribute("sandbox", "allow-scripts");
