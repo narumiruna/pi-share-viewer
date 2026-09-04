@@ -38,6 +38,10 @@ async function copyText(value: string): Promise<void> {
     await navigator.clipboard.writeText(value);
     return;
   } catch {
+    const previousFocus =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : undefined;
     const textarea = document.createElement("textarea");
     textarea.value = value;
     textarea.style.position = "fixed";
@@ -48,6 +52,9 @@ async function copyText(value: string): Promise<void> {
       if (!document.execCommand("copy")) throw new Error("Copy failed");
     } finally {
       textarea.remove();
+      if (previousFocus?.isConnected) {
+        previousFocus.focus({ preventScroll: true });
+      }
     }
   }
 }

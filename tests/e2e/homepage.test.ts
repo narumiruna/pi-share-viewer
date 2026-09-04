@@ -97,10 +97,16 @@ test("copies both setup commands with visible feedback", async ({ page }) => {
     };
   });
 
-  await page.getByRole("button", { name: "Copy setup command" }).click();
-  await expect(
-    page.getByRole("button", { name: /Copy setup command — copied/ }),
-  ).toBeVisible();
+  const setupCopyButton = page.getByRole("button", {
+    name: "Copy setup command",
+  });
+  await setupCopyButton.focus();
+  await setupCopyButton.click();
+  const copiedSetupButton = page.getByRole("button", {
+    name: /Copy setup command — copied/,
+  });
+  await expect(copiedSetupButton).toBeVisible();
+  await expect(copiedSetupButton).toBeFocused();
   expect(
     await page.evaluate(
       () => (window as Window & { copiedText?: string }).copiedText,

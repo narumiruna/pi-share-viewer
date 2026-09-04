@@ -215,6 +215,10 @@ async function copyText(source: string): Promise<boolean> {
     await navigator.clipboard.writeText(source);
     return true;
   } catch {
+    const previousFocus =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : undefined;
     const textarea = document.createElement("textarea");
     textarea.value = source;
     textarea.style.position = "fixed";
@@ -227,6 +231,9 @@ async function copyText(source: string): Promise<boolean> {
       return false;
     } finally {
       textarea.remove();
+      if (previousFocus?.isConnected) {
+        previousFocus.focus({ preventScroll: true });
+      }
     }
   }
 }
@@ -391,7 +398,12 @@ async function rerenderDiagrams(dark: boolean): Promise<void> {
       card.dataset.piMermaidKind = decoration.kind;
       card.dataset.piMermaidRenderTheme = rendered.dark ? "dark" : "light";
       view.toolbarBrand.textContent = decoration.kind;
-      fitToViewport(view.viewport, view.stage, view.svg, view.state);
+      if (view.viewport.hidden) {
+        card.dataset.piMermaidNeedsFit = "true";
+      } else {
+        delete card.dataset.piMermaidNeedsFit;
+        fitToViewport(view.viewport, view.stage, view.svg, view.state);
+      }
     } catch {
       card.dataset.piMermaidRenderTheme = "error";
     }
@@ -494,6 +506,15 @@ async function enhanceCode(code: HTMLElement): Promise<void> {
           case "source": {
             sourceView.hidden = !sourceView.hidden;
             viewport.hidden = !sourceView.hidden;
+            if (!viewport.hidden && card.dataset.piMermaidNeedsFit === "true") {
+              await new Promise<void>((resolve) => {
+                requestAnimationFrame(() => {
+                  fitToViewport(viewport, stage, svg, state);
+                  delete card.dataset.piMermaidNeedsFit;
+                  resolve();
+                });
+              });
+            }
             return !sourceView.hidden;
           }
           case "copy":
