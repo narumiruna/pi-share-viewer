@@ -1,6 +1,6 @@
 # pi-share-viewer
 
-`pi-share-viewer` is a self-hosted viewer for Pi session Gists. It keeps Pi's standard exported session UI and converts Mermaid fences into polished, interactive diagrams with pan, zoom, fit, optional edge tracing, fullscreen, source, and copy controls.
+`pi-share-viewer` is a self-hosted viewer for Pi session Gists. It preserves Pi's exported session behavior, applies a responsive Radix-based reading interface, and converts Mermaid fences into polished interactive diagrams with pan, zoom, fit, optional edge tracing, fullscreen, source, and copy controls.
 
 No Pi extension is required. Pi's built-in `/share` already creates `session.html`; `PI_SHARE_VIEWER_URL` changes the URL returned for its GitHub Gist fallback.
 
@@ -28,6 +28,10 @@ Pi `0.85.0` is the verified baseline. Its exported DOM does not retain a `langua
 Diagram conversion runs entirely inside the sandboxed browser iframe. Mermaid remains the syntax and layout engine; a local semantic decorator adds an Archify-inspired signal-flow surface, stable node colors, high-contrast edges, diagram-type labels, and opt-in trace motion. No diagram source is sent to a rendering API, and unsupported SVG details fall back to Mermaid's normal output instead of failing the session.
 
 The progressive decorator is verified for `flowchart`, `sequenceDiagram`, and `stateDiagram-v2`. Other Mermaid diagram types still render with the bundled Mermaid theme and existing viewer controls.
+
+### Radix session interface
+
+The enhancer keeps Pi's original DOM and interaction scripts, then adds a scoped responsive chrome layer using Radix Colors. Mermaid controls run as an isolated React island built with Radix Toolbar, Toggle, Tooltip, and Icons primitives. The restyled sidebar, session metadata, messages, tools, Markdown, tables, and code blocks do not require a second session renderer or any external assets.
 
 ## Configure Pi
 
@@ -191,7 +195,7 @@ Browser support:
 ## Project layout
 
 ```text
-src/                       Gist loader, Mermaid runtime, and SVG decorator
+src/                       Gist loader, Radix session UI, Mermaid runtime, and SVG decorator
 session/                   Session viewer HTML entry
 index.html                 Landing page
 Dockerfile                 Multi-stage production image

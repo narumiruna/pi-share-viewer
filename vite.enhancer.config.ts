@@ -2,6 +2,9 @@ import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vite";
 
 export default defineConfig({
+  define: {
+    "process.env.NODE_ENV": JSON.stringify("production"),
+  },
   publicDir: false,
   build: {
     outDir: fileURLToPath(new URL("./public/assets", import.meta.url)),

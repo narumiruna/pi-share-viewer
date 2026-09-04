@@ -7,6 +7,7 @@ describe("repository shape", () => {
       name?: string;
       private?: boolean;
       pi?: unknown;
+      dependencies?: Record<string, string>;
       peerDependencies?: Record<string, string>;
     };
 
@@ -18,6 +19,22 @@ describe("repository shape", () => {
     ).toBeUndefined();
     expect(existsSync("web")).toBe(false);
     expect(existsSync("src/extension")).toBe(false);
+    expect(packageJson.dependencies).toMatchObject({
+      "@radix-ui/colors": expect.any(String),
+      "@radix-ui/react-icons": expect.any(String),
+      "@radix-ui/react-toggle": expect.any(String),
+      "@radix-ui/react-toolbar": expect.any(String),
+      "@radix-ui/react-tooltip": expect.any(String),
+      react: expect.any(String),
+      "react-dom": expect.any(String),
+    });
+  });
+
+  test("builds the React enhancer for a browser-only production runtime", () => {
+    const enhancerConfig = readFileSync("vite.enhancer.config.ts", "utf8");
+
+    expect(enhancerConfig).toContain('"process.env.NODE_ENV"');
+    expect(enhancerConfig).toContain('JSON.stringify("production")');
   });
 
   test("keeps container execution out of CI", () => {

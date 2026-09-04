@@ -1,6 +1,10 @@
 import mermaid from "mermaid";
 import { decorateMermaidSvg } from "./diagram-style.js";
 import {
+  type DiagramToolbarAction,
+  mountDiagramToolbar,
+} from "./diagram-toolbar.js";
+import {
   getMermaidLimitError,
   MAX_SOURCE_BYTES,
   RENDER_TIMEOUT_MS,
@@ -10,6 +14,7 @@ import {
   normalizeMermaidSource,
   readSessionMermaidSources,
 } from "./mermaid-source.js";
+import { installSessionStyle } from "./session-style.js";
 import { isDarkColor } from "./theme.js";
 
 const MIN_SCALE = 0.25;
@@ -41,10 +46,16 @@ style.textContent = `
 .pi-mermaid-toolbar { display: flex; flex-wrap: wrap; gap: .6rem 1rem; align-items: center; justify-content: space-between; min-height: 3.2rem; padding: .55rem .7rem; border-bottom: 1px solid var(--pi-diagram-border); background: var(--pi-diagram-panel-soft); backdrop-filter: blur(16px); }
 .pi-mermaid-toolbar-brand { display: inline-flex; align-items: center; gap: .5rem; color: var(--pi-diagram-muted); font: 700 .65rem/1 ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .12em; text-transform: uppercase; }
 .pi-mermaid-toolbar-brand::before { width: .5rem; height: .5rem; border-radius: 50%; background: #2dd4bf; box-shadow: 0 0 .8rem #2dd4bf; content: ""; }
-.pi-mermaid-controls { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; }
-.pi-mermaid-toolbar button { min-height: 2rem; border: 1px solid color-mix(in srgb, var(--pi-diagram-border) 84%, transparent); border-radius: .45rem; background: color-mix(in srgb, var(--pi-diagram-panel-soft) 88%, transparent); color: var(--pi-diagram-text); padding: .3rem .58rem; font: 600 .72rem/1 ui-monospace, SFMono-Regular, Consolas, monospace; cursor: pointer; transition: border-color .16s ease, background .16s ease, color .16s ease; }
-.pi-mermaid-toolbar button:hover { border-color: #2dd4bf; background: color-mix(in srgb, #2dd4bf 10%, var(--pi-diagram-panel)); }
-.pi-mermaid-toolbar button[aria-pressed="true"] { border-color: #2dd4bf; color: #2dd4bf; }
+.pi-mermaid-controls { display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; }
+.pi-mermaid-toolbar button { display: inline-grid; width: 2.1rem; min-width: 2.1rem; height: 2.1rem; min-height: 2.1rem; place-items: center; border: 1px solid color-mix(in srgb, var(--pi-diagram-border) 84%, transparent); border-radius: .5rem; background: color-mix(in srgb, var(--pi-diagram-panel-soft) 88%, transparent); color: var(--pi-diagram-text); padding: 0; cursor: pointer; transition: border-color .16s ease, background .16s ease, color .16s ease, transform .16s ease; }
+.pi-mermaid-toolbar button svg { width: 1rem; height: 1rem; }
+.pi-mermaid-toolbar button:hover { border-color: #2dd4bf; background: color-mix(in srgb, #2dd4bf 10%, var(--pi-diagram-panel)); transform: translateY(-1px); }
+.pi-mermaid-toolbar button:focus-visible { outline: 2px solid #2dd4bf; outline-offset: 2px; }
+.pi-mermaid-toolbar button[aria-pressed="true"], .pi-mermaid-toolbar button[data-state="on"] { border-color: #2dd4bf; background: color-mix(in srgb, #2dd4bf 12%, var(--pi-diagram-panel)); color: #2dd4bf; }
+.pi-mermaid-toolbar-separator { width: 1px; height: 1.25rem; margin: 0 .12rem; background: var(--pi-diagram-border); }
+.pi-mermaid-tooltip { z-index: 2147483647; border: 1px solid var(--pi-diagram-border); border-radius: .45rem; background: var(--pi-diagram-panel); color: var(--pi-diagram-text); padding: .4rem .55rem; box-shadow: 0 .6rem 1.8rem rgb(0 0 0 / 30%); font: 600 .68rem/1 ui-monospace, SFMono-Regular, Consolas, monospace; animation: pi-mermaid-tooltip-in .12s ease-out; }
+.pi-mermaid-tooltip-arrow { fill: var(--pi-diagram-border); }
+@keyframes pi-mermaid-tooltip-in { from { opacity: 0; transform: translateY(-2px); } }
 .pi-mermaid-viewport { min-height: 19rem; max-height: 75vh; overflow: hidden; padding: clamp(.75rem, 2vw, 1.5rem); background-image: radial-gradient(circle at 20% 0%, rgb(34 211 238 / 9%), transparent 24rem), linear-gradient(var(--pi-diagram-grid) 1px, transparent 1px), linear-gradient(90deg, var(--pi-diagram-grid) 1px, transparent 1px); background-size: auto, 28px 28px, 28px 28px; cursor: grab; touch-action: none; }
 .pi-mermaid-card[data-pi-mermaid-kind="state"] .pi-mermaid-viewport { height: min(42rem, 75vh); }
 .pi-mermaid-viewport:active { cursor: grabbing; }
@@ -80,7 +91,7 @@ style.textContent = `
 .pi-mermaid-card:fullscreen, .pi-mermaid-card.pi-mermaid-expanded { display: flex; position: fixed; inset: 0; z-index: 2147483647; width: 100vw; height: 100vh; margin: 0; border: 0; border-radius: 0; flex-direction: column; background: var(--pi-diagram-panel); color: var(--pi-diagram-text); }
 .pi-mermaid-card:fullscreen .pi-mermaid-viewport, .pi-mermaid-card.pi-mermaid-expanded .pi-mermaid-viewport { max-height: none; flex: 1; }
 @media (prefers-reduced-motion: reduce) { .pi-mermaid-tracing .pi-mermaid-polished [data-pi-edge="true"] { animation: none; } }
-@media (max-width: 640px) { .pi-mermaid-viewport { min-height: 15rem; padding: .5rem; } .pi-mermaid-toolbar { align-items: flex-start; } .pi-mermaid-controls { width: 100%; } .pi-mermaid-toolbar button { min-height: 2.2rem; padding: .45rem .6rem; } }
+@media (max-width: 640px) { .pi-mermaid-viewport { min-height: 15rem; padding: .5rem; } .pi-mermaid-toolbar { align-items: flex-start; } .pi-mermaid-controls { width: 100%; gap: .2rem; } .pi-mermaid-toolbar button { width: 2rem; min-width: 2rem; height: 2rem; min-height: 2rem; padding: 0; } .pi-mermaid-toolbar-separator { margin-inline: 0; } }
 `;
 document.head.append(style);
 
@@ -89,6 +100,7 @@ const isDarkTheme = isDarkColor(backgroundColor);
 document.documentElement.dataset.piMermaidTheme = isDarkTheme
   ? "dark"
   : "light";
+installSessionStyle();
 mermaid.initialize({
   startOnLoad: false,
   securityLevel: "strict",
@@ -116,14 +128,6 @@ let renderedCount = 0;
 let renderSequence = 0;
 let scanQueued = false;
 let renderQueue = Promise.resolve();
-
-function button(action: string, label: string): HTMLButtonElement {
-  const element = document.createElement("button");
-  element.type = "button";
-  element.dataset.action = action;
-  element.textContent = label;
-  return element;
-}
 
 function applyTransform(stage: HTMLElement, state: ViewState): void {
   stage.style.width = `${state.fitScale * state.scale * 100}%`;
@@ -268,19 +272,6 @@ async function enhanceCode(code: HTMLElement): Promise<void> {
     const toolbarBrand = document.createElement("span");
     toolbarBrand.className = "pi-mermaid-toolbar-brand";
     const controls = document.createElement("div");
-    controls.className = "pi-mermaid-controls";
-    const traceButton = button("trace", "Trace");
-    traceButton.setAttribute("aria-pressed", "false");
-    controls.append(
-      button("zoom-out", "−"),
-      button("zoom-in", "+"),
-      button("fit", "Fit"),
-      button("reset", "Reset"),
-      traceButton,
-      button("source", "Source"),
-      button("copy", "Copy"),
-      button("fullscreen", "Fullscreen"),
-    );
     toolbar.append(toolbarBrand, controls);
 
     const viewport = document.createElement("div");
@@ -312,60 +303,48 @@ async function enhanceCode(code: HTMLElement): Promise<void> {
     const state: ViewState = { fitScale: 1, scale: 1, x: 0, y: 0 };
     fitToViewport(viewport, stage, svg, state);
     installPanZoom(viewport, stage, state);
-    toolbar.addEventListener("click", async (event) => {
-      const target = (event.target as Element).closest<HTMLButtonElement>(
-        "button[data-action]",
-      );
-      if (!target) return;
-      switch (target.dataset.action) {
-        case "zoom-in":
-          setScale(stage, state, state.scale * 1.25);
-          break;
-        case "zoom-out":
-          setScale(stage, state, state.scale / 1.25);
-          break;
-        case "fit":
-          fitToViewport(viewport, stage, svg, state);
-          break;
-        case "reset":
-          state.scale = 1;
-          state.x = 0;
-          state.y = 0;
-          applyTransform(stage, state);
-          break;
-        case "trace": {
-          const active = card.classList.toggle("pi-mermaid-tracing");
-          target.setAttribute("aria-pressed", String(active));
-          break;
-        }
-        case "source":
-          sourceView.hidden = !sourceView.hidden;
-          viewport.hidden = !sourceView.hidden;
-          target.textContent = sourceView.hidden ? "Source" : "Diagram";
-          break;
-        case "copy": {
-          const copied = await copyText(source);
-          target.textContent = copied ? "Copied" : "Copy failed";
-          setTimeout(() => {
-            target.textContent = "Copy";
-          }, 1_200);
-          break;
-        }
-        case "fullscreen":
-          try {
-            if (document.fullscreenElement === card) {
-              await document.exitFullscreen();
-            } else {
-              await card.requestFullscreen();
-            }
-          } catch {
-            card.classList.toggle("pi-mermaid-expanded");
-            target.textContent = card.classList.contains("pi-mermaid-expanded")
-              ? "Close"
-              : "Fullscreen";
+    mountDiagramToolbar(controls, {
+      onAction: async (action: DiagramToolbarAction, active?: boolean) => {
+        switch (action) {
+          case "zoom-in":
+            setScale(stage, state, state.scale * 1.25);
+            break;
+          case "zoom-out":
+            setScale(stage, state, state.scale / 1.25);
+            break;
+          case "fit":
+            fitToViewport(viewport, stage, svg, state);
+            break;
+          case "reset":
+            state.scale = 1;
+            state.x = 0;
+            state.y = 0;
+            applyTransform(stage, state);
+            break;
+          case "trace":
+            card.classList.toggle("pi-mermaid-tracing", active === true);
+            return active === true;
+          case "source": {
+            sourceView.hidden = !sourceView.hidden;
+            viewport.hidden = !sourceView.hidden;
+            return !sourceView.hidden;
           }
-          break;
-      }
+          case "copy":
+            return copyText(source);
+          case "fullscreen":
+            try {
+              if (document.fullscreenElement === card) {
+                await document.exitFullscreen();
+                return false;
+              }
+              await card.requestFullscreen();
+              return true;
+            } catch {
+              const expanded = card.classList.toggle("pi-mermaid-expanded");
+              return expanded;
+            }
+        }
+      },
     });
   } catch (error) {
     const message =
