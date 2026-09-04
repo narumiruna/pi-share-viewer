@@ -33,6 +33,7 @@ export function injectMermaidEnhancer(
   gistId: string,
   viewerOrigin: string,
   theme?: SiteTheme,
+  urlParams = "",
 ): string {
   if (byteLength(sessionHtml) > MAX_SESSION_HTML_BYTES) {
     throw new Error("Session is too large to display safely.");
@@ -74,6 +75,10 @@ export function injectMermaidEnhancer(
   baseUrl.name = "pi-share-base-url";
   baseUrl.content = `${origin.origin}/session/#${gistId.toLowerCase()}`;
 
+  const deepLinkParams = document.createElement("meta");
+  deepLinkParams.name = "pi-url-params";
+  deepLinkParams.content = urlParams;
+
   const runtime = document.createElement("script");
   const rendererConfig = `Object.defineProperty(globalThis, "__PI_MERMAID_RENDERER_SOURCE__", { configurable: false, enumerable: false, writable: false, value: ${JSON.stringify(rendererSource)} });\n`;
   const themeConfig = `Object.defineProperty(globalThis, "__PI_SHARE_VIEWER_THEME__", { configurable: false, enumerable: false, writable: false, value: ${JSON.stringify(theme)} });\n`;
@@ -81,7 +86,7 @@ export function injectMermaidEnhancer(
     `${rendererConfig}${themeConfig}${enhancerSource}`,
   );
 
-  document.head.prepend(policy, baseUrl);
+  document.head.prepend(policy, baseUrl, deepLinkParams);
   document.body.append(runtime);
   return `<!doctype html>\n${document.documentElement.outerHTML}`;
 }

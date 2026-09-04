@@ -4,7 +4,7 @@ import {
   loadSessionHtml,
   MAX_SESSION_HTML_BYTES,
 } from "../src/gist.js";
-import { parseGistId } from "../src/hash.js";
+import { parseGistId, parseSessionHash } from "../src/hash.js";
 
 const GIST_ID = "2b736fe885c106e7ee125d52b1cfecbb";
 
@@ -25,8 +25,16 @@ function responseFromUrl(url: string, body = "{}"): Response {
 }
 
 describe("session hash", () => {
-  test("accepts exactly one Gist ID", () => {
+  test("accepts a Gist ID and canonical Pi deep-link parameters", () => {
     expect(parseGistId(`#${GIST_ID.toUpperCase()}`)).toBe(GIST_ID);
+    expect(
+      parseSessionHash(
+        `#${GIST_ID.toUpperCase()}&targetId=ABCDEF12&leafId=1234ABCD`,
+      ),
+    ).toEqual({
+      gistId: GIST_ID,
+      urlParams: "leafId=1234abcd&targetId=abcdef12",
+    });
   });
 
   test.each([
@@ -35,8 +43,11 @@ describe("session hash", () => {
     `#${GIST_ID}/session.html`,
     `#${GIST_ID}?target=x`,
     `#${GIST_ID}&target=x`,
+    `#${GIST_ID}&leafId=short`,
+    `#${GIST_ID}&leafId=1234abcd&leafId=abcdef12`,
+    `#${GIST_ID}&leafId=1234abcd&unknown=abcdef12`,
   ])("rejects invalid hash %s", (hash) =>
-    expect(() => parseGistId(hash)).toThrow("Invalid session URL"),
+    expect(() => parseSessionHash(hash)).toThrow("Invalid session URL"),
   );
 });
 
