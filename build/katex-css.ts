@@ -10,12 +10,7 @@ export function loadKatexCss(): string {
     resolve(katexDirectory, "dist/katex.min.css"),
     "utf8",
   )
-    .replace(/src:[^;}]+/g, (source) => {
-      const font = /url\((fonts\/KaTeX_[\w-]+\.woff2)\)/.exec(source)?.[1];
-      if (!font) throw new Error("Unexpected KaTeX font declaration");
-      const bytes = readFileSync(resolve(katexDirectory, "dist", font));
-      return `src:url(data:font/woff2;base64,${bytes.toString("base64")}) format("woff2")`;
-    })
+    // Scope selectors before inlining fonts to avoid backtracking over Base64 data.
     .replace(/([^{}]+)\{/g, (rule, selectors: string) => {
       if (selectors.startsWith("@")) return rule;
       return `${selectors
@@ -24,6 +19,12 @@ export function loadKatexCss(): string {
           selector === "body" ? ".pi-math" : `.pi-math ${selector}`,
         )
         .join(",")}{`;
+    })
+    .replace(/src:[^;}]+/g, (source) => {
+      const font = /url\((fonts\/KaTeX_[\w-]+\.woff2)\)/.exec(source)?.[1];
+      if (!font) throw new Error("Unexpected KaTeX font declaration");
+      const bytes = readFileSync(resolve(katexDirectory, "dist", font));
+      return `src:url(data:font/woff2;base64,${bytes.toString("base64")}) format("woff2")`;
     });
   if (/url\((?!data:)/.test(css))
     throw new Error("KaTeX CSS contains an external asset");
