@@ -1,6 +1,6 @@
 # pi-share-viewer
 
-`pi-share-viewer` is a self-hosted viewer for Pi session Gists. It preserves Pi's exported tree navigation, message deep links, and JSONL downloads, applies a responsive Radix-based reading interface, and converts Mermaid fences into polished interactive diagrams with pan, zoom, fit, optional edge tracing, fullscreen, source, and copy controls.
+`pi-share-viewer` is a self-hosted viewer for Pi session Gists. It preserves Pi's exported tree navigation, message deep links, and JSONL downloads, applies a responsive Radix-based reading interface, and converts Mermaid fences into accessible interactive diagrams with natural sizing, pan, zoom, focused tracing, fullscreen, source, export, and deep-link controls.
 
 No Pi extension is required. Pi's built-in `/share` already creates `session.html`; `PI_SHARE_VIEWER_URL` changes the URL returned for its GitHub Gist fallback.
 
@@ -26,9 +26,20 @@ Pi `0.85.0` is the verified baseline. Its exported DOM does not retain a `langua
 
 ### Browser-only diagram polish
 
-Diagram conversion runs entirely in the browser. Each Mermaid render uses a disposable nested sandbox iframe that is removed at the five-second deadline, terminating that renderer before the queue continues. Mermaid remains the syntax and layout engine; a local semantic decorator adds an Archify-inspired signal-flow surface, stable node colors, high-contrast edges, diagram-type labels, and opt-in trace motion. No diagram source is sent to a rendering API, and unsupported SVG details fall back to Mermaid's normal output instead of failing the session.
+Diagram conversion runs entirely in the browser. Each Mermaid render uses a disposable nested sandbox iframe that is removed at the five-second deadline. A visible-first queue runs at most two sandboxes concurrently and leaves offscreen source intact until it approaches the viewport. Mermaid remains the syntax and layout engine; a local semantic decorator adds an Archify-inspired signal-flow surface, explicit semantic node colors, high-contrast edges, diagram-type labels, focused relationships, and opt-in trace motion. No diagram source is sent to a rendering API.
 
-The progressive decorator is verified for `flowchart`, `sequenceDiagram`, and `stateDiagram-v2`. Other Mermaid diagram types still render with the bundled Mermaid theme and existing viewer controls.
+The progressive decorator is verified for `flowchart`, `sequenceDiagram`, and `stateDiagram-v2`. Those diagrams default to Polished mode while preserving Mermaid-authored `classDef`, `style`, `accTitle`, and `accDescr` output; Original mode restores the bundled Mermaid presentation. Other Mermaid diagram types render in Original mode with generic viewer controls and no unsupported semantic decoration.
+
+### Diagram controls
+
+Inline diagrams keep their natural rendered size and only shrink when necessary. Fit recalculates after container resize and fullscreen changes. Available controls include:
+
+- Mouse drag or the arrow keys to pan; `+`/`-` to zoom and `0` to fit.
+- `Ctrl`/`Cmd` + wheel or a two-pointer pinch to zoom around the gesture position. An ordinary wheel or one-finger swipe continues scrolling the session.
+- Original/Polished presentation, optional reduced-motion-aware edge tracing, source display, and fullscreen. Flowchart nodes can be focused to isolate directly related paths; other diagram kinds retain generic tracing when reliable endpoint metadata is unavailable.
+- Copy source, Copy SVG, Download SVG, Download PNG, and Copy diagram link. All exports are generated locally from the accepted SVG and make no rendering-service request.
+
+On narrow screens, secondary actions are available under **More diagram actions**. Malformed or oversized diagrams retain their source and show a concise error with expandable technical details.
 
 ### Radix session interface
 
@@ -95,12 +106,12 @@ gh gist delete <gist-id>
 
 The viewer treats every Gist as untrusted:
 
-- Only a 32-character hexadecimal Gist ID, optional eight-character hexadecimal Pi `leafId`/`targetId` values, and the fixed `session.html` filename are accepted.
+- Only a 32-character hexadecimal Gist ID, optional eight-character hexadecimal Pi `leafId`/`targetId` values, a validated `<entry-id>-diagram-<1..50>` diagram target, and the fixed `session.html` filename are accepted.
 - Raw content must use HTTPS on the exact `gist.githubusercontent.com` host and match the requested Gist and filename.
 - API metadata, session HTML, Mermaid source count, source bytes, rendered SVG bytes, and render time have explicit limits.
 - Remote errors are written with `textContent`, never inserted into the parent page as HTML.
 - The session runs in an iframe with `allow-scripts` and `allow-downloads` so Pi's user-initiated JSONL export works, but without `allow-same-origin`, forms, popups, or top navigation.
-- Separate parent and child Content Security Policies prevent the session from making network requests or loading external images. The parent permits inline script and style only because `srcdoc` inherits its policy; remote values never enter the parent as HTML.
+- Separate parent and child Content Security Policies prevent the session from making network requests or loading external images. Local `data:`/`blob:` images are allowed for SVG-to-PNG export. The parent permits inline script and style only because `srcdoc` inherits its policy; remote values never enter the parent as HTML.
 - Mermaid runs in a disposable nested sandbox that is terminated at the render deadline; the local runtime makes no rendering-service requests and uses `securityLevel: "strict"`.
 - A broken or oversized diagram keeps its source visible and does not stop the rest of the session.
 
@@ -130,6 +141,12 @@ Pi's message copy buttons add validated branch and message identifiers:
 
 ```text
 http://localhost:5173/session/#<gist-id>&leafId=<entry-id>&targetId=<entry-id>
+```
+
+Each rendered Mermaid card can copy a stable diagram link. The diagram target remains separate from Pi's branch parameters:
+
+```text
+http://localhost:5173/session/#<gist-id>&leafId=<entry-id>&targetId=<entry-id>&diagramId=<entry-id>-diagram-<number>
 ```
 
 The local HTTP exception is restricted to loopback hosts. Production viewer origins must use HTTPS.
@@ -225,7 +242,7 @@ Browser support:
 ## Project layout
 
 ```text
-src/                       Gist loader, Radix session UI, Mermaid runtime, and SVG decorator
+src/                       Gist loader, Radix session UI, Mermaid runtime, view controls, render queue, decorator, and export helpers
 session/                   Session viewer HTML entry
 index.html                 Landing page
 Dockerfile                 Multi-stage production image
@@ -244,4 +261,4 @@ Generated files such as `dist/`, `public/assets/mermaid-enhancer.js`, `public/as
 
 The viewer accepts session HTML up to 12 MiB, at most 50 Mermaid diagrams, and up to 100,000 UTF-8 bytes per Mermaid source. Each diagram has a five-second render deadline.
 
-The project does not provide a Pi extension, GitHub OAuth, server-side storage, Gist management, Mermaid editing, image/video export, collaboration, or server-rendered social previews.
+The project does not provide a Pi extension, GitHub OAuth, server-side storage, Gist management, Mermaid editing, video export, collaboration, or server-rendered social previews. SVG and PNG diagram export are browser-local only.

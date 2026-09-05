@@ -20,6 +20,7 @@ describe("session enhancement injection", () => {
       "https://pi.narumi.dev",
       "light",
       "leafId=1234abcd&targetId=abcdef12",
+      "1234abcd-diagram-2",
     );
 
     expect(output.indexOf("Content-Security-Policy")).toBeLessThan(
@@ -37,6 +38,10 @@ describe("session enhancement injection", () => {
       document.querySelector<HTMLMetaElement>('meta[name="pi-url-params"]')
         ?.content,
     ).toBe("leafId=1234abcd&targetId=abcdef12");
+    expect(
+      document.querySelector<HTMLMetaElement>('meta[name="pi-diagram-target"]')
+        ?.content,
+    ).toBe("1234abcd-diagram-2");
     expect(output).toContain("<\\/script><script>bad()<\\/script>");
     expect(output.lastIndexOf("globalThis.loaded")).toBeGreaterThan(
       output.indexOf("session-data"),
@@ -94,6 +99,18 @@ describe("session enhancement injection", () => {
         "http://example.com",
       ),
     ).toThrow("must use HTTPS");
+    expect(() =>
+      injectMermaidEnhancer(
+        SESSION_HTML,
+        "runtime",
+        "renderer",
+        GIST_ID,
+        "https://pi.narumi.dev",
+        undefined,
+        "",
+        "unsafe-diagram-1",
+      ),
+    ).toThrow("Invalid diagram ID");
   });
 });
 

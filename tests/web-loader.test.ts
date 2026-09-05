@@ -37,6 +37,18 @@ describe("session hash", () => {
     });
   });
 
+  test("separates and canonicalizes a diagram target", () => {
+    expect(
+      parseSessionHash(
+        `#${GIST_ID}&diagramId=ABCDEF12-DIAGRAM-2&targetId=1234ABCD`,
+      ),
+    ).toEqual({
+      diagramId: "abcdef12-diagram-2",
+      gistId: GIST_ID,
+      urlParams: "targetId=1234abcd",
+    });
+  });
+
   test.each([
     "",
     "#bad",
@@ -46,6 +58,10 @@ describe("session hash", () => {
     `#${GIST_ID}&leafId=short`,
     `#${GIST_ID}&leafId=1234abcd&leafId=abcdef12`,
     `#${GIST_ID}&leafId=1234abcd&unknown=abcdef12`,
+    `#${GIST_ID}&diagramId=1234abcd-diagram-0`,
+    `#${GIST_ID}&diagramId=1234abcd-diagram-51`,
+    `#${GIST_ID}&diagramId=unsafe-diagram-1`,
+    `#${GIST_ID}&diagramId=1234abcd-diagram-1&diagramId=1234abcd-diagram-2`,
   ])("rejects invalid hash %s", (hash) =>
     expect(() => parseSessionHash(hash)).toThrow("Invalid session URL"),
   );

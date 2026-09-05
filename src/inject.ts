@@ -34,6 +34,7 @@ export function injectMermaidEnhancer(
   viewerBaseUrl: string,
   theme?: SiteTheme,
   urlParams = "",
+  diagramId = "",
 ): string {
   if (byteLength(sessionHtml) > MAX_SESSION_HTML_BYTES) {
     throw new Error("Session is too large to display safely.");
@@ -46,6 +47,12 @@ export function injectMermaidEnhancer(
   }
   if (!/^[0-9a-f]{32}$/i.test(gistId)) {
     throw new Error("Invalid Gist ID.");
+  }
+  if (
+    diagramId &&
+    !/^[0-9a-f]{8}-diagram-(?:[1-9]|[1-4]\d|50)$/i.test(diagramId)
+  ) {
+    throw new Error("Invalid diagram ID.");
   }
 
   const baseUrl = new URL(viewerBaseUrl);
@@ -79,6 +86,10 @@ export function injectMermaidEnhancer(
   deepLinkParams.name = "pi-url-params";
   deepLinkParams.content = urlParams;
 
+  const diagramTarget = document.createElement("meta");
+  diagramTarget.name = "pi-diagram-target";
+  diagramTarget.content = diagramId;
+
   const runtime = document.createElement("script");
   const rendererConfig = `Object.defineProperty(globalThis, "__PI_MERMAID_RENDERER_SOURCE__", { configurable: false, enumerable: false, writable: false, value: ${JSON.stringify(rendererSource)} });\n`;
   const themeConfig = `Object.defineProperty(globalThis, "__PI_SHARE_VIEWER_THEME__", { configurable: false, enumerable: false, writable: false, value: ${JSON.stringify(theme)} });\n`;
@@ -86,7 +97,7 @@ export function injectMermaidEnhancer(
     `${rendererConfig}${themeConfig}${enhancerSource}`,
   );
 
-  document.head.prepend(policy, shareUrl, deepLinkParams);
+  document.head.prepend(policy, shareUrl, deepLinkParams, diagramTarget);
   document.body.append(runtime);
   return `<!doctype html>\n${document.documentElement.outerHTML}`;
 }

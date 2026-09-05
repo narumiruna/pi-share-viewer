@@ -1,8 +1,26 @@
-import { decorateMermaidSvg } from "./diagram-style.js";
+import { installDiagramCss } from "./diagram-css.js";
+import {
+  createPngExport,
+  createSvgExport,
+  downloadDiagramBlob,
+  serializeDiagramSvg,
+} from "./diagram-export.js";
+import { DiagramRenderQueue } from "./diagram-render-queue.js";
+import {
+  type DiagramDisplayMode,
+  decorateMermaidSvg,
+  installDiagramFocus,
+  setDiagramDisplayMode,
+} from "./diagram-style.js";
 import {
   type DiagramToolbarAction,
+  type DiagramToolbarControls,
   mountDiagramToolbar,
 } from "./diagram-toolbar.js";
+import {
+  createDiagramView,
+  type DiagramViewController,
+} from "./diagram-view.js";
 import {
   getMermaidLimitError,
   MAX_RENDERED_SVG_BYTES,
@@ -19,84 +37,7 @@ import {
 import { installSessionStyle } from "./session-style.js";
 import { isDarkColor } from "./theme.js";
 
-const MIN_SCALE = 0.25;
-const MAX_SCALE = 4;
-
-const style = document.createElement("style");
-style.textContent = `
-:root[data-pi-mermaid-theme="dark"] {
-  --pi-diagram-panel: #07101e;
-  --pi-diagram-panel-soft: rgb(15 23 42 / 72%);
-  --pi-diagram-border: #29415f;
-  --pi-diagram-grid: rgb(71 101 135 / 19%);
-  --pi-diagram-text: #f5fbff;
-  --pi-diagram-muted: #9eb0c7;
-  --pi-diagram-edge: #7890ad;
-  --pi-diagram-mask: #07101e;
-}
-:root[data-pi-mermaid-theme="light"] {
-  --pi-diagram-panel: #f8fbfd;
-  --pi-diagram-panel-soft: rgb(255 255 255 / 86%);
-  --pi-diagram-border: #bfd5e2;
-  --pi-diagram-grid: rgb(123 151 170 / 18%);
-  --pi-diagram-text: #102638;
-  --pi-diagram-muted: #587287;
-  --pi-diagram-edge: #6f8fa4;
-  --pi-diagram-mask: #fff;
-}
-.pi-mermaid-card { position: relative; margin: 1rem 0; overflow: hidden; border: 1px solid var(--pi-diagram-border); border-radius: .4rem; background: var(--pi-diagram-panel); color: var(--pi-diagram-text); }
-.pi-mermaid-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; min-height: 2.5rem; padding: .25rem .4rem; border-bottom: 1px solid var(--pi-diagram-border); background: var(--pi-diagram-panel); }
-.pi-mermaid-toolbar-brand { color: var(--pi-diagram-muted); font: 500 .7rem/1 ui-monospace, SFMono-Regular, Consolas, monospace; }
-.pi-mermaid-controls { display: flex; flex-wrap: wrap; gap: .1rem; align-items: center; }
-.pi-mermaid-toolbar button { display: inline-grid; width: 1.9rem; min-width: 1.9rem; height: 1.9rem; min-height: 1.9rem; place-items: center; border: 0; border-radius: .25rem; background: transparent; color: var(--pi-diagram-muted); padding: 0; cursor: pointer; }
-.pi-mermaid-toolbar button svg { width: .95rem; height: .95rem; }
-.pi-mermaid-toolbar button:hover { background: color-mix(in srgb, var(--pi-diagram-border) 35%, transparent); color: var(--pi-diagram-text); }
-.pi-mermaid-toolbar button:focus-visible { outline: 2px solid #2dd4bf; outline-offset: 1px; }
-.pi-mermaid-toolbar button[aria-pressed="true"], .pi-mermaid-toolbar button[data-state="on"] { background: color-mix(in srgb, #2dd4bf 12%, var(--pi-diagram-panel)); color: #2dd4bf; }
-.pi-mermaid-tooltip { z-index: 2147483647; border: 1px solid var(--pi-diagram-border); border-radius: .25rem; background: var(--pi-diagram-panel); color: var(--pi-diagram-text); padding: .35rem .45rem; font: 500 .7rem/1 ui-monospace, SFMono-Regular, Consolas, monospace; }
-.pi-mermaid-viewport { min-height: 19rem; max-height: 75vh; overflow: hidden; padding: 1rem; background: var(--pi-diagram-panel); cursor: grab; touch-action: none; }
-.pi-mermaid-card[data-pi-mermaid-kind="state"] .pi-mermaid-viewport { height: min(42rem, 75vh); }
-.pi-mermaid-viewport:active { cursor: grabbing; }
-.pi-mermaid-stage { width: 100%; margin-inline: auto; transform-origin: 0 0; }
-.pi-mermaid-stage svg { display: block; width: 100%; max-width: none !important; height: auto; margin: auto; overflow: visible; }
-.pi-mermaid-polished { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important; }
-.pi-mermaid-polished [data-pi-tone="cyan"] { --pi-node-fill: rgb(6 182 212 / 14%); --pi-node-stroke: #22d3ee; }
-.pi-mermaid-polished [data-pi-tone="emerald"] { --pi-node-fill: rgb(16 185 129 / 14%); --pi-node-stroke: #34d399; }
-.pi-mermaid-polished [data-pi-tone="violet"] { --pi-node-fill: rgb(139 92 246 / 16%); --pi-node-stroke: #a78bfa; }
-.pi-mermaid-polished [data-pi-tone="amber"] { --pi-node-fill: rgb(245 158 11 / 14%); --pi-node-stroke: #fbbf24; }
-.pi-mermaid-polished [data-pi-tone="rose"] { --pi-node-fill: rgb(244 63 94 / 14%); --pi-node-stroke: #fb7185; }
-.pi-mermaid-polished [data-pi-tone="orange"] { --pi-node-fill: rgb(249 115 22 / 14%); --pi-node-stroke: #fb923c; }
-:root[data-pi-mermaid-theme="light"] .pi-mermaid-polished [data-pi-tone] { --pi-node-fill: color-mix(in srgb, var(--pi-node-stroke) 11%, white); }
-.pi-mermaid-polished g[data-pi-tone] > :is(rect, circle, ellipse, polygon, path), .pi-mermaid-polished g[data-pi-tone] > g > :is(rect, circle, ellipse, polygon, path), .pi-mermaid-polished rect.actor[data-pi-tone] { fill: var(--pi-node-fill) !important; stroke: var(--pi-node-stroke) !important; stroke-width: 1.5px !important; filter: drop-shadow(0 7px 10px rgb(0 0 0 / 16%)); }
-.pi-mermaid-polished g[data-pi-tone] rect, .pi-mermaid-polished rect.actor[data-pi-tone] { rx: 9px; ry: 9px; }
-.pi-mermaid-polished g[data-pi-tone] text, .pi-mermaid-polished g[data-pi-tone] span, .pi-mermaid-polished g[data-pi-tone] p, .pi-mermaid-polished text.actor { color: var(--pi-diagram-text) !important; fill: var(--pi-diagram-text) !important; font-weight: 600 !important; }
-.pi-mermaid-polished [data-pi-edge="true"] { stroke: var(--pi-diagram-edge) !important; stroke-width: 1.45px !important; transition: stroke .15s ease, stroke-width .15s ease; }
-.pi-mermaid-polished [data-pi-edge="true"]:hover { stroke: #2dd4bf !important; stroke-width: 2.5px !important; }
-.pi-mermaid-polished marker path { fill: var(--pi-diagram-edge) !important; stroke: var(--pi-diagram-edge) !important; }
-.pi-mermaid-polished .edgeLabel rect, .pi-mermaid-polished .labelBkg { fill: var(--pi-diagram-mask) !important; opacity: .96 !important; }
-.pi-mermaid-polished .edgeLabel .labelBkg { border-radius: .25rem; }
-.pi-mermaid-polished .edgeLabel :is(div, span, p) { background: var(--pi-diagram-mask) !important; }
-.pi-mermaid-polished .edgeLabel, .pi-mermaid-polished .edgeLabel :is(p, span), .pi-mermaid-polished .messageText, .pi-mermaid-polished .loopText { color: var(--pi-diagram-muted) !important; fill: var(--pi-diagram-muted) !important; }
-.pi-mermaid-polished .cluster rect, .pi-mermaid-polished rect.rect { fill: color-mix(in srgb, var(--pi-diagram-panel) 76%, transparent) !important; stroke: var(--pi-diagram-border) !important; stroke-dasharray: 5 4; }
-.pi-mermaid-polished .cluster-label, .pi-mermaid-polished .labelText { color: var(--pi-diagram-muted) !important; fill: var(--pi-diagram-muted) !important; }
-.pi-mermaid-polished .actor-line { stroke: var(--pi-diagram-border) !important; stroke-dasharray: 5 5; }
-.pi-mermaid-polished .note { fill: color-mix(in srgb, #fbbf24 10%, var(--pi-diagram-panel)) !important; stroke: #d97706 !important; }
-.pi-mermaid-tracing .pi-mermaid-polished [data-pi-edge="true"] { stroke: #2dd4bf !important; stroke-dasharray: 9 7; animation: pi-mermaid-trace 1.1s linear infinite; }
-@keyframes pi-mermaid-trace { to { stroke-dashoffset: -16; } }
-.pi-mermaid-source { max-height: 60vh; margin: 0; overflow: auto; padding: 1rem; border: 0; background: var(--pi-diagram-panel); color: var(--pi-diagram-text); white-space: pre; }
-.pi-mermaid-source[hidden], .pi-mermaid-viewport[hidden] { display: none; }
-.pi-mermaid-renderer-frame { position: fixed; z-index: -1; top: 0; left: 0; width: 1024px; height: 768px; border: 0; opacity: 0; pointer-events: none; }
-.pi-mermaid-error { padding: 1rem; color: #ef4444; font: 500 .85rem/1.5 ui-monospace, monospace; }
-.pi-session-theme-toggle { display: grid; position: fixed; z-index: 2147483646; top: 12px; right: 12px; width: 36px; height: 36px; place-items: center; border: 1px solid var(--borderMuted); border-radius: 4px; background: var(--container-bg); color: var(--text); padding: 0; font: 600 16px/1 ui-sans-serif, system-ui, sans-serif; cursor: pointer; }
-.pi-session-theme-toggle:hover { background: var(--selectedBg); }
-.pi-session-theme-toggle:disabled { opacity: .65; cursor: wait; }
-.pi-session-theme-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.pi-mermaid-card:fullscreen, .pi-mermaid-card.pi-mermaid-expanded { display: flex; position: fixed; inset: 0; z-index: 2147483647; width: 100vw; height: 100vh; margin: 0; border: 0; border-radius: 0; flex-direction: column; background: var(--pi-diagram-panel); color: var(--pi-diagram-text); }
-.pi-mermaid-card:fullscreen .pi-mermaid-viewport, .pi-mermaid-card.pi-mermaid-expanded .pi-mermaid-viewport { max-height: none; flex: 1; }
-@media (prefers-reduced-motion: reduce) { .pi-mermaid-tracing .pi-mermaid-polished [data-pi-edge="true"] { animation: none; } }
-@media (max-width: 640px) { .pi-mermaid-viewport { min-height: 15rem; padding: .5rem; } .pi-mermaid-toolbar { align-items: flex-start; } .pi-mermaid-controls { width: 100%; } .pi-mermaid-toolbar button { width: 2rem; min-width: 2rem; height: 2rem; min-height: 2rem; padding: 0; } }
-`;
-document.head.append(style);
+installDiagramCss();
 
 const configuredTheme = (
   globalThis as typeof globalThis & {
@@ -113,46 +54,35 @@ document.documentElement.dataset.piMermaidTheme = isDarkTheme
   : "light";
 installSessionStyle();
 
-const themeToggle = document.createElement("button");
-themeToggle.className = "pi-session-theme-toggle";
-themeToggle.type = "button";
-function updateThemeToggle(): void {
-  const nextTheme = isDarkTheme ? "light" : "dark";
-  themeToggle.textContent = isDarkTheme ? "☀" : "☾";
-  themeToggle.setAttribute("aria-label", `Switch to ${nextTheme} theme`);
-  themeToggle.title = `Switch to ${nextTheme} theme`;
+interface RenderedDiagram {
+  dark: boolean;
+  diagramType: string;
+  svg: string;
 }
-updateThemeToggle();
-themeToggle.addEventListener("click", () => {
-  isDarkTheme = !isDarkTheme;
-  const theme = isDarkTheme ? "dark" : "light";
-  document.documentElement.dataset.piMermaidTheme = theme;
-  updateThemeToggle();
-  themeToggle.disabled = true;
-  themeToggle.setAttribute("aria-busy", "true");
-  window.parent.postMessage({ type: "pi-share-viewer-theme", theme }, "*");
 
-  renderQueue = renderQueue.then(() => rerenderDiagrams(isDarkTheme));
-  void renderQueue.then(() => {
-    themeToggle.disabled = false;
-    themeToggle.removeAttribute("aria-busy");
-  });
-});
-document.body.append(themeToggle);
-
-interface ViewState {
-  fitScale: number;
-  scale: number;
-  x: number;
-  y: number;
+interface DiagramRecord {
+  card: HTMLElement;
+  diagramId: string;
+  displayMode: DiagramDisplayMode;
+  rendering: boolean;
+  retryButton: HTMLButtonElement;
+  scheduled: boolean;
+  source: string;
+  sourceView: HTMLPreElement;
+  status: HTMLElement;
+  toolbar: HTMLElement;
+  toolbarBrand: HTMLElement;
+  view?: DiagramView;
+  visible: boolean;
 }
 
 interface DiagramView {
-  source: string;
+  controller: DiagramViewController;
+  focusCleanup: () => void;
+  polishSupported: boolean;
   stage: HTMLElement;
-  state: ViewState;
   svg: SVGSVGElement;
-  toolbarBrand: HTMLElement;
+  toolbarControls: DiagramToolbarControls;
   viewport: HTMLElement;
 }
 
@@ -161,54 +91,20 @@ const rendererSource = (
     __PI_MERMAID_RENDERER_SOURCE__?: unknown;
   }
 ).__PI_MERMAID_RENDERER_SOURCE__;
+const diagramTarget =
+  document
+    .querySelector<HTMLMetaElement>('meta[name="pi-diagram-target"]')
+    ?.content.trim() || undefined;
 const sessionCodeBlocks = readSessionCodeBlocks();
 const entryBlockPositions = new WeakMap<HTMLElement, number>();
-const diagramViews = new WeakMap<HTMLElement, DiagramView>();
+const entryDiagramPositions = new WeakMap<HTMLElement, number>();
+const records = new Map<HTMLElement, DiagramRecord>();
+const renderQueue = new DiagramRenderQueue(2);
 let renderedCount = 0;
 let renderSequence = 0;
 let scanQueued = false;
-let renderQueue = Promise.resolve();
-
-function applyTransform(stage: HTMLElement, state: ViewState): void {
-  stage.style.width = `${state.fitScale * state.scale * 100}%`;
-  stage.style.transform = `translate(${state.x}px, ${state.y}px)`;
-}
-
-function fitToViewport(
-  viewport: HTMLElement,
-  stage: HTMLElement,
-  svg: SVGSVGElement,
-  state: ViewState,
-): void {
-  const viewBox = svg.viewBox.baseVal;
-  const computedStyle = getComputedStyle(viewport);
-  const horizontalPadding =
-    Number.parseFloat(computedStyle.paddingLeft) +
-    Number.parseFloat(computedStyle.paddingRight);
-  const verticalPadding =
-    Number.parseFloat(computedStyle.paddingTop) +
-    Number.parseFloat(computedStyle.paddingBottom);
-  const availableWidth = Math.max(1, viewport.clientWidth - horizontalPadding);
-  const availableHeight = Math.max(1, viewport.clientHeight - verticalPadding);
-  const fullWidthHeight =
-    viewBox.width > 0 ? availableWidth * (viewBox.height / viewBox.width) : 0;
-
-  state.fitScale =
-    fullWidthHeight > availableHeight ? availableHeight / fullWidthHeight : 1;
-  state.scale = 1;
-  state.x = 0;
-  state.y = 0;
-  applyTransform(stage, state);
-}
-
-function setScale(
-  stage: HTMLElement,
-  state: ViewState,
-  nextScale: number,
-): void {
-  state.scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, nextScale));
-  applyTransform(stage, state);
-}
+let themeGeneration = 0;
+let targetFocused = false;
 
 async function copyText(source: string): Promise<boolean> {
   try {
@@ -238,58 +134,6 @@ async function copyText(source: string): Promise<boolean> {
   }
 }
 
-function installPanZoom(
-  viewport: HTMLElement,
-  stage: HTMLElement,
-  state: ViewState,
-): void {
-  let pointerId: number | undefined;
-  let lastX = 0;
-  let lastY = 0;
-
-  viewport.addEventListener("pointerdown", (event) => {
-    if ((event.target as Element).closest("button")) return;
-    pointerId = event.pointerId;
-    lastX = event.clientX;
-    lastY = event.clientY;
-    viewport.setPointerCapture(pointerId);
-  });
-  viewport.addEventListener("pointermove", (event) => {
-    if (event.pointerId !== pointerId) return;
-    state.x += event.clientX - lastX;
-    state.y += event.clientY - lastY;
-    lastX = event.clientX;
-    lastY = event.clientY;
-    applyTransform(stage, state);
-  });
-  const stopPanning = (event: PointerEvent) => {
-    if (event.pointerId === pointerId) pointerId = undefined;
-  };
-  viewport.addEventListener("pointerup", stopPanning);
-  viewport.addEventListener("pointercancel", stopPanning);
-  viewport.addEventListener(
-    "wheel",
-    (event) => {
-      event.preventDefault();
-      setScale(stage, state, state.scale * (event.deltaY < 0 ? 1.1 : 0.9));
-    },
-    { passive: false },
-  );
-}
-
-function showRenderError(pre: HTMLPreElement, message: string): void {
-  const error = document.createElement("div");
-  error.className = "pi-mermaid-error";
-  error.textContent = message;
-  pre.before(error);
-}
-
-interface RenderedDiagram {
-  dark: boolean;
-  diagramType: string;
-  svg: string;
-}
-
 function escapeInlineScript(source: string): string {
   return source.replace(/<\/script/gi, "<\\/script");
 }
@@ -297,12 +141,14 @@ function escapeInlineScript(source: string): string {
 function renderMermaidInSandbox(
   source: string,
   dark = isDarkTheme,
+  signal?: AbortSignal,
 ): Promise<RenderedDiagram> {
   if (typeof rendererSource !== "string") {
     return Promise.reject(
       new Error("Mermaid renderer runtime is unavailable."),
     );
   }
+  if (signal?.aborted) return Promise.reject(signal.reason);
 
   const requestId = `${Date.now()}-${renderSequence++}`;
   const rendererHtml = `<!doctype html><html><head><meta charset="UTF-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"></head><body><script>${escapeInlineScript(rendererSource)}</script></body></html>`;
@@ -318,12 +164,18 @@ function renderMermaidInSandbox(
   return new Promise((resolve, reject) => {
     let settled = false;
     const cleanup = () => {
-      if (settled) return;
+      if (settled) return false;
       settled = true;
       window.clearTimeout(timer);
       window.removeEventListener("message", receiveResult);
+      signal?.removeEventListener("abort", abort);
       frame.remove();
       URL.revokeObjectURL(rendererUrl);
+      return true;
+    };
+    const abort = () => {
+      if (cleanup())
+        reject(signal?.reason ?? new DOMException("Aborted", "AbortError"));
     };
     const receiveResult = (event: MessageEvent) => {
       if (
@@ -332,9 +184,8 @@ function renderMermaidInSandbox(
       ) {
         return;
       }
-
       const result = event.data;
-      cleanup();
+      if (!cleanup()) return;
       if ("error" in result) {
         reject(new Error(result.error));
         return;
@@ -346,10 +197,10 @@ function renderMermaidInSandbox(
       resolve({ dark, diagramType: result.diagramType, svg: result.svg });
     };
     const timer = window.setTimeout(() => {
-      cleanup();
-      reject(new Error("Diagram rendering timed out."));
+      if (cleanup()) reject(new Error("Diagram rendering timed out."));
     }, RENDER_TIMEOUT_MS);
 
+    signal?.addEventListener("abort", abort, { once: true });
     window.addEventListener("message", receiveResult);
     frame.addEventListener(
       "load",
@@ -371,208 +222,533 @@ function renderMermaidInSandbox(
   });
 }
 
-async function rerenderDiagrams(dark: boolean): Promise<void> {
-  const cards = document.querySelectorAll<HTMLElement>(".pi-mermaid-card");
-  for (const card of cards) {
-    const view = diagramViews.get(card);
-    if (!view) continue;
+function errorSummary(message: string): string {
+  const line = /(?:line|at line)\s+(\d+)/i.exec(message)?.[1];
+  if (line) return `Mermaid syntax error near line ${line}. Source preserved.`;
+  if (/timed out/i.test(message))
+    return "Diagram rendering timed out. Source preserved.";
+  if (/too large|limit exceeded/i.test(message))
+    return `${message} Source preserved.`;
+  return "Unable to render Mermaid. Source preserved.";
+}
 
-    try {
-      const rendered = await renderMermaidInSandbox(view.source, dark);
-      const nextStage = document.createElement("div");
-      nextStage.innerHTML = rendered.svg;
-      const nextSvg = nextStage.querySelector("svg");
-      if (!(nextSvg instanceof SVGSVGElement)) {
-        throw new Error("Mermaid did not produce an SVG diagram.");
-      }
+function showRenderError(record: DiagramRecord, message: string): void {
+  visibilityObserver?.unobserve(record.card);
+  record.status.remove();
+  record.toolbarBrand.textContent = "Mermaid error";
+  const panel = document.createElement("div");
+  panel.className = "pi-mermaid-error";
+  panel.setAttribute("role", "alert");
+  const summary = document.createElement("p");
+  summary.textContent = errorSummary(message);
+  const copy = document.createElement("button");
+  copy.type = "button";
+  copy.textContent = "Copy source";
+  copy.addEventListener("click", async () => {
+    copy.textContent = (await copyText(record.source))
+      ? "Source copied"
+      : "Copy failed";
+  });
+  const details = document.createElement("details");
+  const detailsSummary = document.createElement("summary");
+  detailsSummary.textContent = "Technical details";
+  const technical = document.createElement("pre");
+  technical.className = "pi-mermaid-error-details";
+  technical.textContent = `Unable to render Mermaid: ${message.slice(0, 500)}`;
+  details.append(detailsSummary, technical);
+  panel.append(summary, copy, details);
+  record.sourceView.before(panel);
+  record.sourceView.querySelector("code")?.classList.add("hljs");
+  record.sourceView.hidden = false;
+  record.card.classList.remove("pi-mermaid-card");
+  record.card.classList.add("pi-mermaid-error-card");
+  record.card.dataset.piMermaidState = "error";
+}
 
-      for (const attribute of Array.from(view.svg.attributes)) {
-        view.svg.removeAttribute(attribute.name);
-      }
-      for (const attribute of Array.from(nextSvg.attributes)) {
-        view.svg.setAttribute(attribute.name, attribute.value);
-      }
-      view.svg.replaceChildren(...Array.from(nextSvg.childNodes));
+function parseSvg(markup: string): SVGSVGElement {
+  const holder = document.createElement("div");
+  holder.innerHTML = markup;
+  const svg = holder.querySelector(":scope > svg");
+  if (!(svg instanceof SVGSVGElement)) {
+    throw new Error("Mermaid did not produce an SVG diagram.");
+  }
+  return svg;
+}
 
-      const decoration = decorateMermaidSvg(view.svg, rendered.diagramType);
-      card.dataset.piMermaidKind = decoration.kind;
-      card.dataset.piMermaidRenderTheme = rendered.dark ? "dark" : "light";
-      view.toolbarBrand.textContent = decoration.kind;
-      if (view.viewport.hidden) {
-        card.dataset.piMermaidNeedsFit = "true";
-      } else {
-        delete card.dataset.piMermaidNeedsFit;
-        fitToViewport(view.viewport, view.stage, view.svg, view.state);
+function ensureAccessibleSvg(
+  svg: SVGSVGElement,
+  kind: string,
+  diagramNumber: number,
+): void {
+  if (!svg.hasAttribute("role")) svg.setAttribute("role", "graphics-document");
+  if (!svg.querySelector("title")) {
+    const title = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "title",
+    );
+    const titleId = `${svg.id || `pi-diagram-${diagramNumber}`}-title`;
+    title.id = titleId;
+    title.textContent = `${kind} diagram ${diagramNumber}`;
+    svg.prepend(title);
+    svg.setAttribute("aria-labelledby", titleId);
+  }
+}
+
+function exportOptions(record: DiagramRecord) {
+  const background = getComputedStyle(document.documentElement)
+    .getPropertyValue("--pi-diagram-panel")
+    .trim();
+  const title = record.view?.svg.querySelector("title")?.textContent?.trim();
+  return {
+    background: background || (isDarkTheme ? "#07101e" : "#f8fbfd"),
+    title: title || record.diagramId,
+  };
+}
+
+function diagramLink(diagramId: string): string | undefined {
+  const base = document
+    .querySelector<HTMLMetaElement>('meta[name="pi-share-base-url"]')
+    ?.content.trim();
+  if (!base) return undefined;
+  const piParameters = document
+    .querySelector<HTMLMetaElement>('meta[name="pi-url-params"]')
+    ?.content.trim();
+  return `${base}${piParameters ? `&${piParameters}` : ""}&diagramId=${diagramId}`;
+}
+
+async function toolbarAction(
+  record: DiagramRecord,
+  action: DiagramToolbarAction,
+  active?: boolean,
+): Promise<boolean | undefined> {
+  const view = record.view;
+  if (!view) return false;
+  switch (action) {
+    case "zoom-in":
+      view.controller.zoomBy(1.25);
+      return;
+    case "zoom-out":
+      view.controller.zoomBy(0.8);
+      return;
+    case "fit":
+      view.controller.fit();
+      return;
+    case "reset":
+      view.controller.reset();
+      return;
+    case "trace":
+      record.card.classList.toggle("pi-mermaid-tracing", active === true);
+      return active === true;
+    case "display-mode": {
+      record.displayMode = active === true ? "polished" : "original";
+      const mode = setDiagramDisplayMode(view.svg, record.displayMode);
+      record.displayMode = mode;
+      record.card.dataset.piMermaidDisplay = mode;
+      return mode === "polished";
+    }
+    case "source": {
+      record.sourceView.hidden = !record.sourceView.hidden;
+      view.viewport.hidden = !record.sourceView.hidden;
+      if (!view.viewport.hidden) {
+        requestAnimationFrame(() => {
+          view.controller.refresh(true);
+          record.card.removeAttribute("data-pi-mermaid-needs-fit");
+        });
       }
-    } catch {
-      card.dataset.piMermaidRenderTheme = "error";
+      return !record.sourceView.hidden;
+    }
+    case "copy-source":
+      return copyText(record.source);
+    case "copy-svg":
+      return copyText(serializeDiagramSvg(view.svg, exportOptions(record)));
+    case "download-svg":
+      downloadDiagramBlob(
+        createSvgExport(view.svg, exportOptions(record)),
+        record.diagramId,
+        "svg",
+      );
+      return true;
+    case "download-png": {
+      // Measure HTML labels synchronously, even while the source view is open.
+      const hidden = view.viewport.hidden;
+      let exporting: Promise<Blob>;
+      try {
+        view.viewport.hidden = false;
+        exporting = createPngExport(view.svg, exportOptions(record));
+      } finally {
+        view.viewport.hidden = hidden;
+      }
+      const png = await exporting;
+      downloadDiagramBlob(png, record.diagramId, "png");
+      return true;
+    }
+    case "copy-link": {
+      const link = diagramLink(record.diagramId);
+      return link ? copyText(link) : false;
+    }
+    case "fullscreen": {
+      try {
+        if (document.fullscreenElement === record.card) {
+          await document.exitFullscreen();
+          requestAnimationFrame(() => view.controller.refresh(true));
+          return false;
+        }
+        await record.card.requestFullscreen();
+        requestAnimationFrame(() => view.controller.refresh(true));
+        return true;
+      } catch {
+        const expanded = record.card.classList.toggle("pi-mermaid-expanded");
+        requestAnimationFrame(() => view.controller.refresh(true));
+        return expanded;
+      }
     }
   }
 }
 
-async function enhanceCode(code: HTMLElement): Promise<void> {
-  if (code.dataset.piMermaidState && code.dataset.piMermaidState !== "queued") {
-    return;
-  }
-  code.dataset.piMermaidState = "processing";
+function focusTarget(record: DiagramRecord): void {
+  if (targetFocused || record.diagramId !== diagramTarget) return;
+  targetFocused = true;
+  const focus = () => {
+    record.card.scrollIntoView({ block: "center" });
+    record.card.focus({ preventScroll: true });
+  };
+  requestAnimationFrame(focus);
+  setTimeout(focus, 100);
+}
 
+function mountRenderedDiagram(
+  record: DiagramRecord,
+  rendered: RenderedDiagram,
+): void {
+  record.status.remove();
+  record.status.className = "pi-mermaid-inline-status";
+  record.status.removeAttribute("role");
+  record.status.textContent = "";
+  record.toolbarBrand.after(record.status);
+  const viewport = document.createElement("div");
+  viewport.className = "pi-mermaid-viewport";
+  viewport.tabIndex = 0;
+  viewport.setAttribute("role", "region");
+  const stage = document.createElement("div");
+  stage.className = "pi-mermaid-stage";
+  const svg = parseSvg(rendered.svg);
+  stage.append(svg);
+  viewport.append(stage);
+
+  const diagramNumber = Number(record.diagramId.split("-").at(-1)) || 1;
+  const decoration = decorateMermaidSvg(
+    svg,
+    rendered.diagramType,
+    record.displayMode,
+  );
+  record.displayMode = svg.dataset.piDisplayMode as DiagramDisplayMode;
+  ensureAccessibleSvg(svg, decoration.kind, diagramNumber);
+  viewport.setAttribute(
+    "aria-label",
+    `Interactive ${decoration.kind} diagram. Use arrow keys to pan, plus or minus to zoom, and zero to fit.`,
+  );
+  record.card.dataset.piMermaidKind = decoration.kind;
+  record.card.dataset.piMermaidDisplay = record.displayMode;
+  record.card.dataset.piMermaidRenderTheme = rendered.dark ? "dark" : "light";
+  record.card.dataset.piMermaidState = "rendered";
+  record.toolbarBrand.textContent = decoration.kind;
+  record.sourceView.hidden = true;
+  record.sourceView.before(viewport);
+
+  let toolbarControls: DiagramToolbarControls = {
+    announce: () => undefined,
+    setZoom: () => undefined,
+  };
+  const controller = createDiagramView(viewport, stage, {
+    isExpanded: () =>
+      document.fullscreenElement === record.card ||
+      record.card.classList.contains("pi-mermaid-expanded"),
+    onEscape: () => {
+      if (record.card.classList.contains("pi-mermaid-expanded")) {
+        record.card.classList.remove("pi-mermaid-expanded");
+        requestAnimationFrame(() => controller.refresh(true));
+        return true;
+      }
+      return false;
+    },
+    onScaleChange: (percentage) => toolbarControls.setZoom(percentage),
+  });
+  const focusCleanup = installDiagramFocus(svg);
+  record.view = {
+    controller,
+    focusCleanup,
+    polishSupported: decoration.polishSupported,
+    stage,
+    svg,
+    toolbarControls,
+    viewport,
+  };
+  toolbarControls = mountDiagramToolbar(record.toolbar, {
+    displayMode: record.displayMode,
+    fullscreenTarget: record.card,
+    onAction: (action, active) =>
+      toolbarAction(record, action, active).catch((error) => {
+        const message =
+          error instanceof Error ? error.message : "Diagram action failed.";
+        toolbarControls.announce(message);
+        return false;
+      }),
+    polishSupported: decoration.polishSupported,
+  });
+  record.view.toolbarControls = toolbarControls;
+  requestAnimationFrame(() => {
+    toolbarControls.setZoom(Math.round(controller.getState().scale * 100));
+  });
+  focusTarget(record);
+}
+
+async function rerenderRecord(
+  record: DiagramRecord,
+  dark: boolean,
+  signal: AbortSignal,
+): Promise<void> {
+  const view = record.view;
+  if (!view) return;
+  const rendered = await renderMermaidInSandbox(record.source, dark, signal);
+  const nextSvg = parseSvg(rendered.svg);
+  for (const attribute of [...view.svg.attributes]) {
+    view.svg.removeAttribute(attribute.name);
+  }
+  for (const attribute of [...nextSvg.attributes]) {
+    view.svg.setAttribute(attribute.name, attribute.value);
+  }
+  view.svg.replaceChildren(...nextSvg.childNodes);
+  const decoration = decorateMermaidSvg(
+    view.svg,
+    rendered.diagramType,
+    record.displayMode,
+  );
+  ensureAccessibleSvg(
+    view.svg,
+    decoration.kind,
+    Number(record.diagramId.split("-").at(-1)) || 1,
+  );
+  view.focusCleanup();
+  view.focusCleanup = installDiagramFocus(view.svg);
+  record.card.dataset.piMermaidKind = decoration.kind;
+  record.card.dataset.piMermaidRenderTheme = rendered.dark ? "dark" : "light";
+  record.card.removeAttribute("data-pi-mermaid-theme-status");
+  record.retryButton.hidden = true;
+  record.toolbarBrand.textContent = decoration.kind;
+  record.status.textContent = "";
+  if (view.viewport.hidden) {
+    record.card.dataset.piMermaidNeedsFit = "true";
+  } else {
+    view.controller.refresh();
+  }
+}
+
+function scheduleInitialRender(record: DiagramRecord, priority: number): void {
+  if (
+    record.scheduled ||
+    record.rendering ||
+    record.view ||
+    record.card.dataset.piMermaidState === "error"
+  )
+    return;
+  record.scheduled = true;
+  record.status.textContent = "Rendering diagram…";
+  void renderQueue
+    .enqueue(
+      (signal) => {
+        record.scheduled = false;
+        record.rendering = true;
+        return renderMermaidInSandbox(record.source, isDarkTheme, signal);
+      },
+      { group: "initial", priority },
+    )
+    .then((rendered) => {
+      record.rendering = false;
+      mountRenderedDiagram(record, rendered);
+      if (rendered.dark !== isDarkTheme)
+        scheduleThemeRender(record, themeGeneration);
+    })
+    .catch((error) => {
+      record.scheduled = false;
+      record.rendering = false;
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      showRenderError(
+        record,
+        error instanceof Error
+          ? error.message
+          : "Unknown Mermaid rendering error.",
+      );
+    });
+}
+
+function scheduleThemeRender(
+  record: DiagramRecord,
+  generation: number,
+): Promise<void> {
+  return renderQueue
+    .enqueue((signal) => rerenderRecord(record, isDarkTheme, signal), {
+      generation,
+      group: "theme",
+      key: record.diagramId,
+      priority: record.visible ? 100 : 0,
+    })
+    .catch((error) => {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      record.card.dataset.piMermaidThemeStatus = "error";
+      record.retryButton.hidden = false;
+      record.status.textContent =
+        "Theme refresh failed; previous diagram retained.";
+      record.view?.toolbarControls.announce(record.status.textContent);
+    });
+}
+
+const visibilityObserver =
+  typeof IntersectionObserver === "function"
+    ? new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            const card = entry.target as HTMLElement;
+            const record = records.get(card);
+            if (!record) continue;
+            record.visible = entry.isIntersecting;
+            if (entry.isIntersecting) {
+              scheduleInitialRender(record, 100);
+              renderQueue.reprioritize(
+                "theme",
+                themeGeneration,
+                record.diagramId,
+                100,
+              );
+            }
+          }
+        },
+        { rootMargin: "800px 0px" },
+      )
+    : undefined;
+
+function createRecord(
+  code: HTMLElement,
+  entryId: string,
+  diagramNumber: number,
+  schedule = true,
+): DiagramRecord {
   const pre = code.parentElement;
   if (!(pre instanceof HTMLPreElement)) {
-    code.dataset.piMermaidState = "ignored";
-    return;
+    throw new Error("Mermaid source is not inside a code block.");
   }
+  const diagramId = `${entryId}-diagram-${diagramNumber}`;
+  const card = document.createElement("figure");
+  card.id = diagramId;
+  card.className = "pi-mermaid-card";
+  card.dataset.piMermaidState = "queued";
+  card.tabIndex = -1;
 
-  const source = code.textContent ?? "";
-  renderedCount += 1;
-  const limitError = getMermaidLimitError(renderedCount, source);
-  if (limitError) {
-    showRenderError(pre, limitError);
-    code.dataset.piMermaidState = "limited";
-    return;
-  }
+  const toolbar = document.createElement("figcaption");
+  toolbar.className = "pi-mermaid-toolbar";
+  toolbar.id = `${diagramId}-caption`;
+  card.setAttribute("aria-labelledby", toolbar.id);
+  const toolbarBrand = document.createElement("span");
+  toolbarBrand.className = "pi-mermaid-toolbar-brand";
+  toolbarBrand.textContent = "Mermaid";
+  const status = document.createElement("span");
+  status.className = "pi-mermaid-pending";
+  status.setAttribute("role", "status");
+  status.textContent = "Waiting to render diagram…";
+  const retryButton = document.createElement("button");
+  retryButton.className = "pi-mermaid-retry";
+  retryButton.type = "button";
+  retryButton.textContent = "Retry theme";
+  retryButton.hidden = true;
+  const controls = document.createElement("div");
+  toolbar.append(toolbarBrand, retryButton, controls);
 
-  try {
-    const rendered = await renderMermaidInSandbox(source);
-    const card = document.createElement("section");
-    card.className = "pi-mermaid-card";
-    card.dataset.piMermaidState = "rendered";
-    card.dataset.piMermaidRenderTheme = rendered.dark ? "dark" : "light";
+  const sourceView = document.createElement("pre");
+  sourceView.id = `${diagramId}-source`;
+  sourceView.className = "pi-mermaid-source";
+  const sourceCode = document.createElement("code");
+  sourceCode.dataset.piMermaidState = "source";
+  sourceCode.textContent = code.textContent ?? "";
+  sourceView.append(sourceCode);
+  card.append(toolbar, status, sourceView);
+  pre.replaceWith(card);
 
-    const toolbar = document.createElement("div");
-    toolbar.className = "pi-mermaid-toolbar";
-    const toolbarBrand = document.createElement("span");
-    toolbarBrand.className = "pi-mermaid-toolbar-brand";
-    const controls = document.createElement("div");
-    toolbar.append(toolbarBrand, controls);
-
-    const viewport = document.createElement("div");
-    viewport.className = "pi-mermaid-viewport";
-    const stage = document.createElement("div");
-    stage.className = "pi-mermaid-stage";
-    stage.innerHTML = rendered.svg;
-    const svg = stage.querySelector("svg");
-    if (!(svg instanceof SVGSVGElement)) {
-      throw new Error("Mermaid did not produce an SVG diagram.");
+  const record: DiagramRecord = {
+    card,
+    diagramId,
+    displayMode: "polished",
+    rendering: false,
+    retryButton,
+    scheduled: false,
+    source: sourceCode.textContent,
+    sourceView,
+    status,
+    toolbar: controls,
+    toolbarBrand,
+    visible: false,
+  };
+  retryButton.addEventListener("click", () => {
+    retryButton.hidden = true;
+    void scheduleThemeRender(record, themeGeneration);
+  });
+  records.set(card, record);
+  if (schedule) {
+    visibilityObserver?.observe(card);
+    if (!visibilityObserver || diagramId === diagramTarget) {
+      scheduleInitialRender(record, diagramId === diagramTarget ? 1_000 : 10);
     }
-    const decoration = decorateMermaidSvg(svg, rendered.diagramType);
-    card.dataset.piMermaidKind = decoration.kind;
-    toolbarBrand.textContent = decoration.kind;
-    viewport.append(stage);
-
-    const sourceView = document.createElement("pre");
-    sourceView.className = "pi-mermaid-source";
-    sourceView.hidden = true;
-    const sourceCode = document.createElement("code");
-    sourceCode.dataset.piMermaidState = "source";
-    sourceCode.textContent = source;
-    sourceView.append(sourceCode);
-
-    card.append(toolbar, viewport, sourceView);
-    pre.replaceWith(card);
-
-    const state: ViewState = { fitScale: 1, scale: 1, x: 0, y: 0 };
-    diagramViews.set(card, {
-      source,
-      stage,
-      state,
-      svg,
-      toolbarBrand,
-      viewport,
-    });
-    fitToViewport(viewport, stage, svg, state);
-    installPanZoom(viewport, stage, state);
-    mountDiagramToolbar(controls, {
-      fullscreenTarget: card,
-      onAction: async (action: DiagramToolbarAction, active?: boolean) => {
-        switch (action) {
-          case "zoom-in":
-            setScale(stage, state, state.scale * 1.25);
-            break;
-          case "zoom-out":
-            setScale(stage, state, state.scale / 1.25);
-            break;
-          case "fit":
-            fitToViewport(viewport, stage, svg, state);
-            break;
-          case "reset":
-            state.scale = 1;
-            state.x = 0;
-            state.y = 0;
-            applyTransform(stage, state);
-            break;
-          case "trace":
-            card.classList.toggle("pi-mermaid-tracing", active === true);
-            return active === true;
-          case "source": {
-            sourceView.hidden = !sourceView.hidden;
-            viewport.hidden = !sourceView.hidden;
-            if (!viewport.hidden && card.dataset.piMermaidNeedsFit === "true") {
-              await new Promise<void>((resolve) => {
-                requestAnimationFrame(() => {
-                  fitToViewport(viewport, stage, svg, state);
-                  delete card.dataset.piMermaidNeedsFit;
-                  resolve();
-                });
-              });
-            }
-            return !sourceView.hidden;
-          }
-          case "copy":
-            return copyText(source);
-          case "fullscreen":
-            try {
-              if (document.fullscreenElement === card) {
-                await document.exitFullscreen();
-                return false;
-              }
-              await card.requestFullscreen();
-              return true;
-            } catch {
-              const expanded = card.classList.toggle("pi-mermaid-expanded");
-              return expanded;
-            }
-        }
-      },
-    });
-  } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Unknown Mermaid rendering error.";
-    showRenderError(pre, `Unable to render Mermaid: ${message.slice(0, 500)}`);
-    code.dataset.piMermaidState = "error";
   }
+  if (diagramId === diagramTarget) {
+    card.scrollIntoView({ block: "center" });
+  }
+  return record;
+}
+
+function createLimitedRecord(
+  code: HTMLElement,
+  entryId: string,
+  diagramNumber: number,
+  message: string,
+): void {
+  const record = createRecord(code, entryId, diagramNumber, false);
+  record.scheduled = true;
+  showRenderError(record, message);
 }
 
 function scanEntry(entry: HTMLElement): void {
-  const blocks = sessionCodeBlocks.get(entry.id.slice("entry-".length));
+  const entryId = entry.id.slice("entry-".length);
+  const blocks = sessionCodeBlocks.get(entryId);
   if (!blocks) return;
 
   let blockIndex = entryBlockPositions.get(entry) ?? 0;
+  let diagramNumber = entryDiagramPositions.get(entry) ?? 0;
   const codes = entry.querySelectorAll<HTMLElement>(
     ".markdown-content pre > code",
   );
   for (const code of codes) {
-    if (code.dataset.piMermaidState || code.closest(".pi-mermaid-card")) {
+    if (code.dataset.piMermaidState || code.closest(".pi-mermaid-card"))
       continue;
-    }
-
     const block = blocks[blockIndex];
     if (!block) break;
-    if (normalizeMermaidSource(code.textContent ?? "") !== block.source) {
+    if (normalizeMermaidSource(code.textContent ?? "") !== block.source)
       continue;
-    }
 
     blockIndex += 1;
     if (!block.isMermaid) {
       code.dataset.piMermaidState = "ordinary";
       continue;
     }
-
+    diagramNumber += 1;
+    renderedCount += 1;
     code.dataset.piMermaidState = "queued";
-    renderQueue = renderQueue.then(() => enhanceCode(code));
+    const limitError = getMermaidLimitError(renderedCount, block.source);
+    if (limitError) {
+      createLimitedRecord(code, entryId, diagramNumber, limitError);
+    } else {
+      createRecord(code, entryId, diagramNumber);
+    }
   }
   entryBlockPositions.set(entry, blockIndex);
+  entryDiagramPositions.set(entry, diagramNumber);
 }
 
 function scan(): void {
@@ -590,8 +766,52 @@ function scheduleScan(): void {
   setTimeout(scan, 0);
 }
 
-new MutationObserver(scheduleScan).observe(document.body, {
+const themeToggle = document.createElement("button");
+themeToggle.className = "pi-session-theme-toggle";
+themeToggle.type = "button";
+function updateThemeToggle(): void {
+  const nextTheme = isDarkTheme ? "light" : "dark";
+  themeToggle.textContent = isDarkTheme ? "☀" : "☾";
+  themeToggle.setAttribute("aria-label", `Switch to ${nextTheme} theme`);
+  themeToggle.title = `Switch to ${nextTheme} theme`;
+}
+updateThemeToggle();
+themeToggle.addEventListener("click", () => {
+  isDarkTheme = !isDarkTheme;
+  const theme = isDarkTheme ? "dark" : "light";
+  document.documentElement.dataset.piMermaidTheme = theme;
+  updateThemeToggle();
+  themeToggle.setAttribute("aria-busy", "true");
+  window.parent.postMessage({ type: "pi-share-viewer-theme", theme }, "*");
+
+  const generation = ++themeGeneration;
+  renderQueue.cancelOlder("theme", generation);
+  const work = [...records.values()]
+    .filter((record) => record.view)
+    .map((record) => scheduleThemeRender(record, generation));
+  void Promise.allSettled(work).then(() => {
+    if (generation === themeGeneration)
+      themeToggle.removeAttribute("aria-busy");
+  });
+});
+document.body.append(themeToggle);
+
+const mutationObserver = new MutationObserver(scheduleScan);
+mutationObserver.observe(document.body, {
   childList: true,
   subtree: true,
 });
+window.addEventListener(
+  "pagehide",
+  () => {
+    mutationObserver.disconnect();
+    visibilityObserver?.disconnect();
+    renderQueue.destroy();
+    for (const record of records.values()) {
+      record.view?.focusCleanup();
+      record.view?.controller.destroy();
+    }
+  },
+  { once: true },
+);
 scheduleScan();

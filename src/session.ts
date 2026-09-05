@@ -52,7 +52,9 @@ export async function loadViewer(): Promise<void> {
   const timer = setTimeout(() => controller.abort(), LOAD_TIMEOUT_MS);
 
   try {
-    const { gistId, urlParams } = parseSessionHash(window.location.hash);
+    const { diagramId, gistId, urlParams } = parseSessionHash(
+      window.location.hash,
+    );
     const viewerBaseUrl = new URL("../", window.location.href);
     const [sessionHtml, enhancerSource, rendererSource] = await Promise.all([
       loadSessionHtml(gistId, { signal: controller.signal }),
@@ -75,6 +77,7 @@ export async function loadViewer(): Promise<void> {
       viewerBaseUrl.href,
       getSavedTheme(),
       urlParams,
+      diagramId,
     );
     loading.hidden = true;
     frame.hidden = false;
