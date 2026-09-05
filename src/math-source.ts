@@ -34,7 +34,8 @@ export function readMath(source: string): MathSource | undefined {
   let end = source.indexOf(close, open.length);
   while (end !== -1) {
     if (escaped(source, end)) {
-      end = source.indexOf(close, end + close.length);
+      // An escaped dollar can overlap the real closing pair: $$a\$$$.
+      end = source.indexOf(close, end + 1);
       continue;
     }
     // A doubled dollar is never the end of a single-dollar formula.
@@ -85,7 +86,9 @@ function rawHtml(source: string): string | undefined {
   if (!tag) return;
   if (
     /\/>$/.test(tag[0]) ||
-    /^(?:br|hr|img|input|meta|link|wbr)$/i.test(tag[1])
+    /^(?:area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)$/i.test(
+      tag[1],
+    )
   )
     return tag[0];
   const closing = new RegExp(
@@ -119,22 +122,25 @@ export function createMathParser(
         level: "inline",
         tokenizer(src) {
           const raw = rawHtml(src);
-          return raw ? { type: "piMathHtml", raw } : undefined;
+          if (!raw) return;
+          // Keep the outer reference definitions and inline state, but do not
+          // enhance math inside this literal. Options belong to this parse;
+          // restoring them also keeps following formulas enhanced.
+          const options = this.lexer.options;
+          const extensions = options.extensions;
+          try {
+            options.extensions = null;
+            return {
+              type: "piMathHtml",
+              raw,
+              tokens: this.lexer.inlineTokens(raw),
+            };
+          } finally {
+            options.extensions = extensions;
+          }
         },
         renderer(token) {
-          // Pi's customized renderer is shared by marked parses. A nested
-          // baseline parse must not leave its parser installed on that object.
-          const renderer = upstream.defaults.renderer;
-          const parser = renderer?.parser;
-          const options = renderer?.options;
-          try {
-            return upstream.parseInline(token.raw);
-          } finally {
-            if (renderer && parser && options) {
-              renderer.parser = parser;
-              renderer.options = options;
-            }
-          }
+          return this.parser.parseInline(token.tokens as Token[]);
         },
       },
       {

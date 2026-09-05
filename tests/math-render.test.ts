@@ -34,6 +34,16 @@ describe("safe math rendering", () => {
     expect(span.querySelector(".katex-display")).not.toBeNull();
   });
 
+  test("renders a display formula ending in an escaped dollar", () => {
+    const span = formula(String.raw`$$a\$$$`);
+    renderMath(span, new MathBudget());
+    expect(span.dataset.piMathState).toBe("rendered");
+    expect(span.querySelector("math annotation")?.textContent).toBe(
+      String.raw`a\$`,
+    );
+    expect(span.querySelector(".katex-display")).not.toBeNull();
+  });
+
   test.each([
     String.raw`$\unknowncommand$`,
     String.raw`$\frac{a}$`,

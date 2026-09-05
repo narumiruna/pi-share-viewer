@@ -1,9 +1,15 @@
+import { readFileSync } from "node:fs";
+import { runInNewContext } from "node:vm";
 import { Marked } from "marked";
 import { describe, expect, test } from "vitest";
 import { createMathParser, readMath } from "../src/math-source.js";
 
-function fixture() {
-  const upstream = new Marked<string, string>({
+const exportedMarked = runInNewContext(
+  `${readFileSync("node_modules/@earendil-works/pi-coding-agent/dist/core/export-html/vendor/marked.min.js", "utf8")}; marked`,
+) as { Marked: typeof Marked };
+
+function parserFixture(MarkedRuntime: typeof Marked) {
+  const upstream = new MarkedRuntime<string, string>({
     breaks: true,
     tokenizer: { html: () => undefined, tag: () => undefined },
     renderer: { codespan: () => false },
@@ -19,15 +25,17 @@ function fixture() {
   return { upstream, parse };
 }
 
-function count(source: string): number {
-  return (
-    fixture()
-      .parse(source)
-      .match(/class="pi-math"/g) ?? []
-  ).length;
-}
-
-describe("pre-Markdown math recognition", () => {
+describe.each([
+  { name: "installed Marked", MarkedRuntime: Marked },
+  { name: "Pi export Marked", MarkedRuntime: exportedMarked.Marked },
+])("pre-Markdown math recognition ($name)", ({ MarkedRuntime }) => {
+  const fixture = () => parserFixture(MarkedRuntime);
+  const count = (source: string) =>
+    (
+      fixture()
+        .parse(source)
+        .match(/class="pi-math"/g) ?? []
+    ).length;
   test.each([
     ["$x_i$", false],
     [String.raw`\(x_{i_j}\)`, false],
@@ -80,6 +88,97 @@ $$`,
     "$x$$",
   ])("does not convert excluded or ambiguous input: %s", (source) => {
     expect(count(source)).toBe(0);
+  });
+
+  test.each([
+    "area",
+    "base",
+    "br",
+    "col",
+    "embed",
+    "hr",
+    "img",
+    "input",
+    "link",
+    "meta",
+    "param",
+    "source",
+    "track",
+    "wbr",
+  ])("excludes only the tag for void element %s", (tag) => {
+    const { parse, upstream } = fixture();
+    for (const name of [tag, tag.toUpperCase()]) {
+      const literal = `<${name} title="$attribute$">`;
+      expect(parse(literal)).toBe(upstream.parse(literal));
+      expect(count(`${literal} then $x$`)).toBe(1);
+    }
+  });
+
+  test("recognizes overlapping display closers after an escaped dollar", () => {
+    const source = String.raw`$$a\$$$`;
+    expect(readMath(`${source} trailing`)).toEqual({
+      raw: source,
+      text: String.raw`a\$`,
+      display: true,
+    });
+    expect(count(source)).toBe(1);
+    expect(count(`${source} then $z$`)).toBe(2);
+    expect(readMath(String.raw`$$a\$$`)).toBeUndefined();
+    expect(readMath(String.raw`$$a\\$$`)).toMatchObject({
+      text: String.raw`a\\`,
+    });
+  });
+
+  test.each([
+    "<span>[docs][d] $literal$</span>",
+    "<span>[d][] and [d] and ![image][d]</span>",
+    "<span><span>**[docs][d]**</span></span>",
+    "<span>[docs][d]", // Unclosed HTML also uses the baseline context.
+    "<!-- [docs][d] $literal$ -->",
+  ])("preserves reference definitions inside excluded HTML: %s", (literal) => {
+    const { parse, upstream } = fixture();
+    for (const source of [
+      `${literal}\n\n[d]: https://example.com/docs "Docs"`,
+      `[d]: https://example.com/docs "Docs"\n\n${literal}`,
+    ]) {
+      const baseline = upstream.parse(source);
+      expect(baseline).toContain('href="https://example.com/docs"');
+      expect(parse(source)).toBe(baseline);
+      expect(parse(`${source}\n\nAfter $z$.`)).toContain('class="pi-math"');
+    }
+  });
+
+  test.each([
+    "$$unclosed",
+    String.raw`\[unclosed`,
+    "$$   $$",
+    "$$x$$ trailing",
+    String.raw`\[x\] trailing`,
+    "    $$x$$",
+  ])(
+    "does not split paragraphs at rejected display blocks: %s",
+    (candidate) => {
+      const { parse, upstream } = fixture();
+      const source = `before\n${candidate}`;
+      // Replace only accepted formulas with a sentinel to compare paragraph
+      // structure without conflating it with intentional math protection.
+      const math = readMath(candidate.trimStart());
+      const expected = upstream.parse(
+        math ? source.replace(math.raw, "MATH") : source,
+      );
+      const output = parse(source).replace(
+        /<span class="pi-math"[^>]*>.*?<\/span>/gs,
+        "MATH",
+      );
+      expect(output).toBe(expected);
+    },
+  );
+
+  test("finds a valid display block after rejected candidates", () => {
+    const { parse } = fixture();
+    expect(parse("before\n$$unclosed\n\n  $$x$$\nafter")).toContain(
+      '</p>\n<span class="pi-math" data-pi-math-display="true">  $$x$$',
+    );
   });
 
   test("bounds repeated unmatched delimiters without losing subsequent valid math", () => {
