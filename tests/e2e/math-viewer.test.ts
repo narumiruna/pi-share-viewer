@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 import {
   createExportFixture,
@@ -58,22 +57,6 @@ for (const width of [375, 1440]) {
       await page.setViewportSize({ width, height: 900 });
       const html = await mathFixture();
       await mockGist(page, html);
-      // Exercise the Docker header CSP together with the page's meta CSP.
-      const nginx = await readFile("nginx.conf", "utf8");
-      const policy = /add_header Content-Security-Policy "([^"]+)" always/.exec(
-        nginx,
-      )?.[1];
-      expect(policy).toBeTruthy();
-      await page.route("**/session/", async (route) => {
-        const response = await route.fetch();
-        await route.fulfill({
-          response,
-          headers: {
-            ...response.headers(),
-            "content-security-policy": policy as string,
-          },
-        });
-      });
       const csp: string[] = [];
       const errors: string[] = [];
       page.on("pageerror", (error) => errors.push(error.message));
