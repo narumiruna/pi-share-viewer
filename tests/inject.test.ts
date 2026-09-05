@@ -19,6 +19,7 @@ describe("session enhancement injection", () => {
       GIST_ID,
       "https://pi.narumi.dev",
       "light",
+      "leafId=1234abcd&targetId=abcdef12",
     );
 
     expect(output.indexOf("Content-Security-Policy")).toBeLessThan(
@@ -31,6 +32,11 @@ describe("session enhancement injection", () => {
     expect(output).toContain('value: "light"');
     expect(output).toContain("globalThis.rendererLoaded = true;");
     expect(output).toContain(`https://pi.narumi.dev/session/#${GIST_ID}`);
+    const document = new DOMParser().parseFromString(output, "text/html");
+    expect(
+      document.querySelector<HTMLMetaElement>('meta[name="pi-url-params"]')
+        ?.content,
+    ).toBe("leafId=1234abcd&targetId=abcdef12");
     expect(output).toContain("<\\/script><script>bad()<\\/script>");
     expect(output.lastIndexOf("globalThis.loaded")).toBeGreaterThan(
       output.indexOf("session-data"),

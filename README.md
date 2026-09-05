@@ -1,6 +1,6 @@
 # pi-share-viewer
 
-`pi-share-viewer` is a self-hosted viewer for Pi session Gists. It preserves Pi's exported session behavior, applies a responsive Radix-based reading interface, and converts Mermaid fences into polished interactive diagrams with pan, zoom, fit, optional edge tracing, fullscreen, source, and copy controls.
+`pi-share-viewer` is a self-hosted viewer for Pi session Gists. It preserves Pi's exported tree navigation, message deep links, and JSONL downloads, applies a responsive Radix-based reading interface, and converts Mermaid fences into polished interactive diagrams with pan, zoom, fit, optional edge tracing, fullscreen, source, and copy controls.
 
 No Pi extension is required. Pi's built-in `/share` already creates `session.html`; `PI_SHARE_VIEWER_URL` changes the URL returned for its GitHub Gist fallback.
 
@@ -95,11 +95,11 @@ gh gist delete <gist-id>
 
 The viewer treats every Gist as untrusted:
 
-- Only a 32-character hexadecimal Gist ID and the fixed `session.html` filename are accepted.
+- Only a 32-character hexadecimal Gist ID, optional eight-character hexadecimal Pi `leafId`/`targetId` values, and the fixed `session.html` filename are accepted.
 - Raw content must use HTTPS on the exact `gist.githubusercontent.com` host and match the requested Gist and filename.
 - API metadata, session HTML, Mermaid source count, source bytes, rendered SVG bytes, and render time have explicit limits.
 - Remote errors are written with `textContent`, never inserted into the parent page as HTML.
-- The session runs in an iframe with only `allow-scripts`, without downloads, `allow-same-origin`, forms, popups, or top navigation.
+- The session runs in an iframe with `allow-scripts` and `allow-downloads` so Pi's user-initiated JSONL export works, but without `allow-same-origin`, forms, popups, or top navigation.
 - Separate parent and child Content Security Policies prevent the session from making network requests or loading external images. The parent permits inline script and style only because `srcdoc` inherits its policy; remote values never enter the parent as HTML.
 - Mermaid runs in a disposable nested sandbox that is terminated at the render deadline; the local runtime makes no rendering-service requests and uses `securityLevel: "strict"`.
 - A broken or oversized diagram keeps its source visible and does not stop the rest of the session.
@@ -124,6 +124,12 @@ Open `http://localhost:5173/`. A local session URL has this form:
 
 ```text
 http://localhost:5173/session/#<gist-id>
+```
+
+Pi's message copy buttons add validated branch and message identifiers:
+
+```text
+http://localhost:5173/session/#<gist-id>&leafId=<entry-id>&targetId=<entry-id>
 ```
 
 The local HTTP exception is restricted to loopback hosts. Production viewer origins must use HTTPS.

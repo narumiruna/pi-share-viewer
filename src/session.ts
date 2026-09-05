@@ -1,5 +1,5 @@
 import { loadSessionHtml } from "./gist.js";
-import { parseGistId } from "./hash.js";
+import { parseSessionHash } from "./hash.js";
 import { injectMermaidEnhancer } from "./inject.js";
 import {
   applyTheme,
@@ -52,7 +52,7 @@ export async function loadViewer(): Promise<void> {
   const timer = setTimeout(() => controller.abort(), LOAD_TIMEOUT_MS);
 
   try {
-    const gistId = parseGistId(window.location.hash);
+    const { gistId, urlParams } = parseSessionHash(window.location.hash);
     const [sessionHtml, enhancerSource, rendererSource] = await Promise.all([
       loadSessionHtml(gistId, { signal: controller.signal }),
       loadRuntimeSource("/assets/mermaid-enhancer.js", controller.signal),
@@ -67,6 +67,7 @@ export async function loadViewer(): Promise<void> {
       gistId,
       window.location.origin,
       getSavedTheme(),
+      urlParams,
     );
     loading.hidden = true;
     frame.hidden = false;

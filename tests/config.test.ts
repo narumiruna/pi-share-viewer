@@ -72,7 +72,7 @@ describe("repository shape", () => {
     expect(nginx).toContain('default "no-store"');
     expect(nginx).toContain('"public, max-age=31536000, immutable"');
     expect(nginx).toContain("location = /healthz");
-    expect(sessionPage).toContain('sandbox="allow-scripts"');
-    expect(sessionPage).not.toContain("allow-downloads");
+    expect(sessionPage).toContain('sandbox="allow-scripts allow-downloads"');
+    expect(sessionPage).not.toContain("allow-same-origin");
   });
 });

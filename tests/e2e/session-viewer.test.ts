@@ -48,6 +48,23 @@ function replaceSessionText(
   return html.replace(match[0], `${match[1]}${encoded}${match[3]}`);
 }
 
+function readSessionData(html: string): {
+  entries: Array<{ id: string; type: string }>;
+  header?: { id?: string };
+  leafId: string;
+} {
+  const match =
+    /<script id="session-data" type="application\/json">\s*([^<\s]+)\s*<\/script>/i.exec(
+      html,
+    );
+  if (!match) throw new Error("Pi export is missing session-data");
+  return JSON.parse(Buffer.from(match[1], "base64").toString("utf8")) as {
+    entries: Array<{ id: string; type: string }>;
+    header?: { id?: string };
+    leafId: string;
+  };
+}
+
 async function mockGist(page: Page, html: string): Promise<void> {
   await page.route("https://api.github.com/gists/**", async (route) => {
     await route.fulfill({
@@ -294,10 +311,72 @@ test("loads a real Pi export and enhances Mermaid diagrams", async ({
     .toBe("light");
 
   const iframe = page.locator("#preview");
-  await expect(iframe).toHaveAttribute("sandbox", "allow-scripts");
+  await expect(iframe).toHaveAttribute(
+    "sandbox",
+    "allow-scripts allow-downloads",
+  );
   await expect(iframe).toHaveAttribute("allow", "fullscreen");
   await expect(iframe).not.toHaveAttribute("sandbox", /allow-same-origin/);
   expect(cspErrors).toEqual([]);
+});
+
+test("preserves Pi message deep links and JSONL downloads", async ({
+  page,
+}) => {
+  const html = await createExportFixture();
+  const session = readSessionData(html);
+  const targetId = session.entries.find(
+    (entry) => entry.type === "message" && entry.id !== session.leafId,
+  )?.id;
+  if (!targetId) throw new Error("Fixture needs a non-leaf message entry");
+
+  await mockGist(page, html);
+  await page.goto(
+    `/session/#${DARK_GIST_ID}&targetId=${targetId}&leafId=${session.leafId}`,
+  );
+
+  const frame = page.frameLocator("#preview");
+  await expect(page.locator("#error")).toBeHidden();
+  await expect(frame.locator(`#entry-${targetId}`)).toBeVisible();
+  await expect(frame.locator('meta[name="pi-url-params"]')).toHaveAttribute(
+    "content",
+    `leafId=${session.leafId}&targetId=${targetId}`,
+  );
+
+  await frame.locator("body").evaluate(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: (text: string) => {
+          (
+            window as Window & { copiedSessionLink?: string }
+          ).copiedSessionLink = text;
+          return Promise.resolve();
+        },
+      },
+    });
+  });
+  await frame.locator(`#entry-${targetId} .copy-link-btn`).click();
+  await expect
+    .poll(() =>
+      frame
+        .locator("body")
+        .evaluate(
+          () =>
+            (window as Window & { copiedSessionLink?: string })
+              .copiedSessionLink,
+        ),
+    )
+    .toBe(
+      `http://127.0.0.1:4173/session/#${DARK_GIST_ID}&leafId=${session.leafId}&targetId=${targetId}`,
+    );
+
+  const downloadPromise = page.waitForEvent("download");
+  await frame.locator(".download-json-btn").click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe(
+    `${session.header?.id ?? "session"}.jsonl`,
+  );
 });
 
 test("preserves fence identity and supports Markdown containers", async ({
