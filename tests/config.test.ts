@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, test } from "vitest";
+import appConfig from "../vite.config.js";
 import runtimeConfig from "../vite.runtime.config.js";
 
 describe("repository shape", () => {
@@ -34,6 +35,25 @@ describe("repository shape", () => {
       react: expect.any(String),
       "react-dom": expect.any(String),
     });
+  });
+
+  test("builds HTML entries from src with root-level public assets and output", () => {
+    expect(appConfig).toMatchObject({
+      root: resolve("src"),
+      publicDir: resolve("public"),
+      build: {
+        outDir: resolve("dist"),
+        emptyOutDir: true,
+        rollupOptions: {
+          input: {
+            home: resolve("src/index.html"),
+            session: resolve("src/session/index.html"),
+          },
+        },
+      },
+    });
+    expect(existsSync("src/index.html")).toBe(true);
+    expect(existsSync("src/session/index.html")).toBe(true);
   });
 
   test.each([
@@ -100,7 +120,7 @@ describe("repository shape", () => {
   });
 
   test("keeps session sandbox and local asset policies", () => {
-    const sessionPage = readFileSync("session/index.html", "utf8");
+    const sessionPage = readFileSync("src/session/index.html", "utf8");
 
     expect(sessionPage).toContain('sandbox="allow-scripts allow-downloads"');
     expect(sessionPage).toContain("img-src data: blob:");

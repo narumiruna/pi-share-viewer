@@ -37,7 +37,7 @@ npm run ci         # lint, unit tests, typecheck, production build
 npm run test:e2e   # Playwright browser tests
 ```
 
-Open `/session/#<gist-id>` to view a session locally. Production output is in `dist/`. E2E tests use a local Pi export and mocked GitHub requests, not real Gists. Chrome/Chromium is verified; Firefox and Safari are not.
+HTML entries are in `src/index.html` and `src/session/index.html`; static assets are in `public/`. Open `/session/#<gist-id>` to view a session locally. Production output is in `dist/`. E2E tests use a local Pi export and mocked GitHub requests, not real Gists. Chrome/Chromium is verified; Firefox and Safari are not.
 
 ## Security and limits
 
