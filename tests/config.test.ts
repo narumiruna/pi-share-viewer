@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, test } from "vitest";
-import enhancerConfig from "../vite.enhancer.config.js";
+import runtimeConfig from "../vite.runtime.config.js";
 
 describe("repository shape", () => {
   test("is a private, flat Web app without a Pi extension", () => {
@@ -35,17 +36,44 @@ describe("repository shape", () => {
     });
   });
 
-  test("builds isolated browser-only Mermaid runtimes", () => {
-    const enhancerConfig = readFileSync("vite.enhancer.config.ts", "utf8");
-    const rendererConfig = readFileSync("vite.renderer.config.ts", "utf8");
+  test.each([
+    ["enhancer", "src/enhancer.ts", "PiMermaidEnhancer"],
+    ["renderer", "src/mermaid-renderer.ts", "PiMermaidRenderer"],
+  ])("builds the isolated browser-only %s runtime", (mode, entry, name) => {
+    const config = runtimeConfig({ command: "build", mode });
 
-    expect(enhancerConfig).toContain('"process.env.NODE_ENV"');
-    expect(enhancerConfig).toContain('JSON.stringify("production")');
-    expect(rendererConfig).toContain("src/mermaid-renderer.ts");
-    expect(rendererConfig).toContain('fileName: () => "mermaid-renderer.js"');
+    expect(config).toMatchObject({
+      define: { "process.env.NODE_ENV": JSON.stringify("production") },
+      publicDir: false,
+      build: {
+        outDir: resolve("public/assets"),
+        emptyOutDir: false,
+        lib: { entry: resolve(entry), formats: ["iife"], name },
+        minify: "esbuild",
+      },
+    });
+    const lib = config.build?.lib;
+    expect(lib).toBeTruthy();
+    if (!lib || typeof lib.fileName !== "function") {
+      throw new Error("Expected a runtime library with a fileName function");
+    }
+    expect(lib.fileName("iife", "index")).toBe(`mermaid-${mode}.js`);
+    if (mode === "renderer") {
+      expect(config.define?.__PI_KATEX_CSS__).toBeUndefined();
+    }
+  });
+
+  test("rejects unknown runtime modes", () => {
+    expect(() =>
+      runtimeConfig({ command: "build", mode: "production" }),
+    ).toThrow("Unsupported runtime mode: production");
   });
 
   test("embeds scoped KaTeX styles, licensed WOFF2 fonts and no external URLs", () => {
+    const enhancerConfig = runtimeConfig({
+      command: "build",
+      mode: "enhancer",
+    });
     const css = JSON.parse(
       enhancerConfig.define?.__PI_KATEX_CSS__ as string,
     ) as string;
