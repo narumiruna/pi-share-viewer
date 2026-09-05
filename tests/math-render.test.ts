@@ -46,6 +46,31 @@ describe("safe math rendering", () => {
   });
 
   test.each([
+    String.raw`\[
+T(0)=I.
+\]`,
+    "$$T(0)=I.$$",
+  ])(
+    "renders display tokens with surrounding Markdown whitespace: %s",
+    (raw) => {
+      const span = formula(`  ${raw}\n\t `);
+      const budget = new MathBudget();
+      renderMath(span, budget);
+      expect(span.dataset.piMathState).toBe("rendered");
+      expect(span.querySelector("math annotation")?.textContent?.trim()).toBe(
+        "T(0)=I.",
+      );
+      expect(span.querySelector(".katex-display")).not.toBeNull();
+      expect(budget.bytes).toBe(
+        new TextEncoder().encode(`  ${raw}\n\t `).length,
+      );
+    },
+  );
+
+  test.each([
+    "  $$\\unknowncommand$$\n",
+    "$$x$$ trailing text\n",
+    "$$x$$\n$$y$$",
     String.raw`$\unknowncommand$`,
     String.raw`$\frac{a}$`,
     String.raw`$\def\x{\x}\x$`,
