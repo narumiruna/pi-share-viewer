@@ -1,9 +1,0 @@
-[project]
-targets = ["pi"]
-
-[instructions]
-
-[skills]
-"tt-a1i/archify" = { include = ["archify"], exclude = [] }
-
-[mcp]
