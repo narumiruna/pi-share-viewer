@@ -136,7 +136,7 @@ The local HTTP exception is restricted to loopback hosts. Production viewer orig
 
 ## Deploy with GitHub Pages
 
-The included `.github/workflows/deploy-pages.yml` workflow publishes `dist/` after every push to `main`. It derives Vite's base path from the repository name, so both project sites such as `https://<owner>.github.io/pi-share-viewer/` and root sites named `<owner>.github.io` work without source changes.
+The included `.github/workflows/deploy-pages.yml` workflow publishes `dist/` after every push to `main`. It uses the base path reported by GitHub Pages, so repository URLs and custom domains work without source changes.
 
 1. Push the repository to GitHub.
 2. In **Settings → Pages → Build and deployment**, select **GitHub Actions** as the source.
@@ -148,7 +148,14 @@ The included `.github/workflows/deploy-pages.yml` workflow publishes `dist/` aft
    pi
    ```
 
-For this repository, the expected URL is `https://narumiruna.github.io/pi-share-viewer/session/`. GitHub Pages only hosts the static viewer; browser requests to the unauthenticated GitHub Gist API remain subject to GitHub's rate limits.
+For a custom subdomain, add a DNS-only `CNAME` record pointing it to `<owner>.github.io`, configure the same domain under **Settings → Pages**, and use the root session path:
+
+```bash
+export PI_SHARE_VIEWER_URL="https://viewer.example.com/session/"
+pi
+```
+
+Keep the Cloudflare proxy disabled until GitHub's DNS check and HTTPS certificate provisioning complete. GitHub Pages only hosts the static viewer; browser requests to the unauthenticated GitHub Gist API remain subject to GitHub's rate limits.
 
 ## Deploy with Docker Compose
 

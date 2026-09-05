@@ -49,6 +49,14 @@ describe("repository shape", () => {
     expect(workflow).not.toContain("docker compose");
   });
 
+  test("builds Pages with GitHub's configured base path", () => {
+    const workflow = readFileSync(".github/workflows/deploy-pages.yml", "utf8");
+
+    expect(workflow).toContain("id: pages");
+    expect(workflow).toContain("steps.pages.outputs.base_path");
+    expect(workflow).not.toContain("repository_name=");
+  });
+
   test("pins a non-root container and hardened Compose service", () => {
     const dockerfile = readFileSync("Dockerfile", "utf8");
     const compose = readFileSync("compose.yaml", "utf8");
