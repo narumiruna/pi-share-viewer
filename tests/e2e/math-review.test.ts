@@ -52,6 +52,42 @@ test("renders math after void literals and escaped display dollars", async ({
   await expect(markdown).toContainText('<source title="$attribute$"> then');
 });
 
+test("keeps raw-text literals inert and renders formulas after their first close", async ({
+  page,
+}) => {
+  const tags = [
+    "script",
+    "style",
+    "textarea",
+    "title",
+    "xmp",
+    "iframe",
+    "noembed",
+    "noframes",
+  ];
+  const literals = tags.map(
+    (tag) => `<${tag}>const marker = "<${tag}>"; $literal$</${tag}>`,
+  );
+  await page.setContent(await fixture(literals.join("\n\n")));
+  const baseline = await page
+    .locator(`${markdownSelector} > p`)
+    .evaluateAll((nodes) => nodes.map((node) => node.innerHTML));
+  const source = literals.map((literal) => `${literal} then $x$.`).join("\n\n");
+  await mockGist(page, await fixture(source));
+  await page.goto(`/session/#${DARK_GIST_ID}`);
+  const markdown = page.frameLocator("#preview").locator(markdownSelector);
+  await expect(markdown.locator(".katex")).toHaveCount(tags.length);
+  const prefixes = await markdown
+    .locator(":scope > p")
+    .evaluateAll((nodes) =>
+      nodes.map((node) => node.innerHTML.split(" then ")[0]),
+    );
+  expect(prefixes).toEqual(baseline);
+  await expect(
+    markdown.locator(":scope > p").locator(tags.join(",")),
+  ).toHaveCount(0);
+});
+
 test("preserves Pi reference rendering and URL sanitization inside HTML literals", async ({
   page,
 }) => {

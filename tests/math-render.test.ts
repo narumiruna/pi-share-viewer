@@ -2,6 +2,7 @@
 
 import { afterEach, describe, expect, test, vi } from "vitest";
 import {
+  MATH_BATCH_SIZE,
   MAX_MATH_COUNT,
   MAX_MATH_SOURCE_BYTES,
   MAX_MATH_TOTAL_BYTES,
@@ -126,6 +127,71 @@ describe("math lifecycle", () => {
     renderer.scan(document);
     vi.runAllTimers();
     expect(renderer.budget.count).toBe(13);
+    renderer.destroy();
+  });
+
+  test.each(["count", "bytes", "one byte left", "two bytes left"])(
+    "drains excess work without more timers once the %s budget is exhausted",
+    (limit) => {
+      vi.useFakeTimers();
+      document.body.innerHTML =
+        '<div class="user-message"><div class="markdown-content"></div></div>';
+      const content = document.querySelector(
+        ".markdown-content",
+      ) as HTMLElement;
+      const nodes = Array.from({ length: 1000 }, () => formula("$x$"));
+      content.append(...nodes);
+      const renderer = new MathRenderer();
+      // Leave one full batch, so exhaustion occurs at a timer boundary.
+      if (limit === "count")
+        renderer.budget.count = MAX_MATH_COUNT - MATH_BATCH_SIZE;
+      else {
+        const remainder =
+          limit === "one byte left" ? 1 : limit === "two bytes left" ? 2 : 0;
+        renderer.budget.bytes =
+          MAX_MATH_TOTAL_BYTES - 3 * MATH_BATCH_SIZE - remainder;
+      }
+      renderer.scan(document);
+      nodes.at(-1)?.remove();
+      vi.advanceTimersToNextTimer();
+      expect(content.querySelectorAll(".katex")).toHaveLength(MATH_BATCH_SIZE);
+      expect(vi.getTimerCount()).toBe(0);
+      expect(
+        content.querySelectorAll('[data-pi-math-state="limited"]'),
+      ).toHaveLength(989);
+      expect(nodes[10].textContent).toBe("$x$");
+      // Reattached and newly-created nodes must never restart an exhausted queue.
+      const fresh = formula("$y$");
+      content.append(nodes.at(-1) as HTMLElement, fresh);
+      renderer.scan(document);
+      renderer.scan(document);
+      expect(vi.getTimerCount()).toBe(0);
+      expect(nodes.at(-1)?.dataset.piMathState).toBe("limited");
+      expect(fresh.dataset.piMathState).toBe("limited");
+      expect(fresh.textContent).toBe("$y$");
+      renderer.destroy();
+    },
+  );
+
+  test("keeps smaller formulas eligible after a cumulative-byte rejection", () => {
+    vi.useFakeTimers();
+    document.body.innerHTML =
+      '<div class="user-message"><div class="markdown-content"></div></div>';
+    const content = document.querySelector(".markdown-content") as HTMLElement;
+    const rejected = formula("$long$");
+    const accepted = formula("$x$");
+    const remaining = formula("$y$");
+    content.append(rejected, accepted, remaining);
+    const renderer = new MathRenderer();
+    renderer.budget.bytes = MAX_MATH_TOTAL_BYTES - 3;
+    renderer.scan(document);
+    vi.runAllTimers();
+    expect(rejected.dataset.piMathState).toBe("limited");
+    expect(accepted.dataset.piMathState).toBe("rendered");
+    expect(remaining.dataset.piMathState).toBe("limited");
+    expect(renderer.budget.count).toBe(1);
+    expect(renderer.budget.bytes).toBe(MAX_MATH_TOTAL_BYTES);
+    expect(vi.getTimerCount()).toBe(0);
     renderer.destroy();
   });
 

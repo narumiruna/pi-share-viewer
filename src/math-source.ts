@@ -91,6 +91,17 @@ function rawHtml(source: string): string | undefined {
     )
   )
     return tag[0];
+  // Raw-text/RCDATA bodies cannot nest elements. Apparent openers and
+  // comments are text; only the first matching end tag terminates the body.
+  if (
+    /^(?:script|style|textarea|title|xmp|iframe|noembed|noframes)$/i.test(
+      tag[1],
+    )
+  ) {
+    const closing = new RegExp(`</${tag[1]}\\s*>`, "gi");
+    closing.lastIndex = tag[0].length;
+    return closing.exec(source) ? source.slice(0, closing.lastIndex) : source;
+  }
   const closing = new RegExp(
     `<!--[\\s\\S]*?(?:-->|$)|<\\/?${tag[1]}(?:\\s(?:"[^"]*"|'[^']*'|[^<>"'])*)?\\s*\\/?>`,
     "gi",

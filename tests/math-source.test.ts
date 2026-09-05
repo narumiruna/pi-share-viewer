@@ -114,6 +114,30 @@ $$`,
     }
   });
 
+  test.each([
+    "script",
+    "style",
+    "textarea",
+    "title",
+    "xmp",
+    "iframe",
+    "noembed",
+    "noframes",
+  ])("ignores apparent nesting in raw-text/RCDATA element %s", (tag) => {
+    const { parse, upstream } = fixture();
+    for (const name of [tag, tag.toUpperCase()]) {
+      const literal = `<${name} title="$attribute$">const marker = "<${name}>"; $literal$</${name}>`;
+      expect(parse(literal)).toBe(upstream.parse(literal));
+      expect(count(`${literal} then $x$`)).toBe(1);
+      expect(count(`<${name}>unclosed <${name}> $literal$`)).toBe(0);
+      expect(
+        count(`<${name}>text</${name}-other> $literal$</${name}> $x$`),
+      ).toBe(1);
+      // Comment syntax is text here: its apparent opener cannot hide a close.
+      expect(count(`<${name}><!-- marker </${name}> then $x$`)).toBe(1);
+    }
+  });
+
   test("recognizes overlapping display closers after an escaped dollar", () => {
     const source = String.raw`$$a\$$$`;
     expect(readMath(`${source} trailing`)).toEqual({

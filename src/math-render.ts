@@ -10,11 +10,18 @@ export class MathBudget {
   count = 0;
   bytes = 0;
 
+  get exhausted(): boolean {
+    // The shortest valid delimited source (for example $x$) needs 3 bytes.
+    return (
+      this.count >= MAX_MATH_COUNT || this.bytes + 3 > MAX_MATH_TOTAL_BYTES
+    );
+  }
+
   accept(raw: string): boolean {
     const bytes = new TextEncoder().encode(raw).length;
     if (
       bytes > MAX_MATH_SOURCE_BYTES ||
-      this.count >= MAX_MATH_COUNT ||
+      this.exhausted ||
       this.bytes + bytes > MAX_MATH_TOTAL_BYTES
     )
       return false;
@@ -74,7 +81,8 @@ export class MathRenderer {
       )
         continue;
       this.seen.add(element);
-      this.pending.push(element);
+      if (this.budget.exhausted) element.dataset.piMathState = "limited";
+      else this.pending.push(element);
     }
     if (this.pending.length && this.timer === undefined) this.schedule();
   }
@@ -83,15 +91,20 @@ export class MathRenderer {
     this.timer = setTimeout(() => {
       this.timer = undefined;
       const batch = this.pending.splice(0, MATH_BATCH_SIZE);
-      for (const element of batch) {
-        if (!element.isConnected) {
-          this.seen.delete(element);
-          continue;
-        }
-        renderMath(element, this.budget);
-      }
-      if (this.pending.length) this.schedule();
+      for (const element of batch) this.process(element);
+      if (this.budget.exhausted) {
+        // No further render can succeed. Release the queue in this turn,
+        // retaining source without parsing or scheduling rejected batches.
+        for (const element of this.pending) this.process(element);
+        this.pending = [];
+      } else if (this.pending.length) this.schedule();
     }, 0);
+  }
+
+  private process(element: HTMLElement): void {
+    if (!element.isConnected) this.seen.delete(element);
+    else if (this.budget.exhausted) element.dataset.piMathState = "limited";
+    else renderMath(element, this.budget);
   }
 
   destroy(): void {
