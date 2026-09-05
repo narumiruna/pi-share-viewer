@@ -202,50 +202,6 @@ pi
 
 Keep the Cloudflare proxy disabled until GitHub's DNS check and HTTPS certificate provisioning complete. GitHub Pages only hosts the static viewer; browser requests to the unauthenticated GitHub Gist API remain subject to GitHub's rate limits.
 
-## Deploy with Docker Compose
-
-Build and start the static Nginx service:
-
-```bash
-docker compose up -d --build
-```
-
-The default host port is `18080`. Override it with `PORT`:
-
-```bash
-PORT=3000 docker compose up -d --build
-```
-
-Verify and inspect the service:
-
-```bash
-curl --fail http://localhost:18080/healthz
-docker compose ps
-docker compose logs viewer
-```
-
-Stop it with:
-
-```bash
-docker compose down
-```
-
-The runtime container uses an unprivileged Nginx image and runs as UID 101 with a read-only root filesystem, dropped Linux capabilities, `no-new-privileges`, and a bounded `/tmp`. It serves HTTP on container port 80; terminate TLS at a reverse proxy or deployment platform.
-
-Example Caddy configuration:
-
-```caddyfile
-pi.narumi.dev {
-    reverse_proxy 127.0.0.1:18080
-}
-```
-
-After DNS and TLS are ready:
-
-```bash
-curl --fail https://pi.narumi.dev/healthz
-```
-
 ## Verification
 
 ```bash
@@ -260,7 +216,7 @@ npm run ci
 
 `npm run test:e2e` creates a real Pi HTML export from `tests/fixtures/session.jsonl`, then intercepts GitHub requests. Automated tests do not create, read, or delete real Gists.
 
-The CI workflow intentionally runs only the Web test job. It statically checks the Docker, Compose, and Nginx configuration but does not build or start the container; verify the deployment commands above in a Docker environment before production use. The separate Pages workflow builds and publishes the static site.
+The CI workflow runs `npm run ci`: formatting and lint checks, unit tests, TypeScript checks, and the production build. Playwright E2E tests run separately with `npm run test:e2e`. The Pages workflow builds and publishes the static site.
 
 Browser support:
 
@@ -273,9 +229,6 @@ Browser support:
 src/                       Gist loader, Radix session UI, math hook/parser/renderer, Mermaid runtime, view controls, render queue, decorator, and export helpers
 session/                   Session viewer HTML entry
 index.html                 Landing page
-Dockerfile                 Multi-stage production image
-nginx.conf                 Static routes, caching, and security headers
-compose.yaml               Self-hosted deployment
 .github/workflows/         CI and GitHub Pages deployment
 vite.config.ts             Static application build
 vite.enhancer.config.ts    Bundled session enhancer build
