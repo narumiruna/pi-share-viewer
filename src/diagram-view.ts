@@ -29,7 +29,7 @@ export interface DiagramViewController {
 
 interface DiagramViewOptions {
   isExpanded?: () => boolean;
-  onEscape?: () => void;
+  onEscape?: () => boolean;
   onScaleChange?: (percentage: number) => void;
 }
 
@@ -211,11 +211,11 @@ export function createDiagramView(
       (viewport.clientWidth - horizontalPadding) / state.naturalWidth,
       (viewport.clientHeight - verticalPadding) / state.naturalHeight,
     );
-    state.scale = clamp(
-      allowUpscale ? scale : Math.min(1, scale),
-      MIN_SCALE,
-      MAX_SCALE,
-    );
+    const fitScale = allowUpscale ? scale : Math.min(1, scale);
+    state.scale =
+      Number.isFinite(fitScale) && fitScale > 0
+        ? Math.min(fitScale, MAX_SCALE)
+        : 1;
     state.userModified = false;
     constrain();
     apply();
@@ -228,7 +228,7 @@ export function createDiagramView(
     point: DiagramPoint,
     worldPoint?: DiagramPoint,
   ): void {
-    const scale = clamp(nextScale, MIN_SCALE, MAX_SCALE);
+    const scale = clamp(nextScale, Math.min(MIN_SCALE, state.scale), MAX_SCALE);
     const world = worldPoint ?? {
       x: (point.x - state.x) / state.scale,
       y: (point.y - state.y) / state.scale,
@@ -380,7 +380,10 @@ export function createDiagramView(
         fitDiagram();
         break;
       case "Escape":
-        options.onEscape?.();
+        if (options.onEscape?.()) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
         return;
       default:
         return;

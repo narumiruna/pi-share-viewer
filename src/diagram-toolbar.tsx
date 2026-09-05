@@ -120,8 +120,15 @@ function DiagramToolbar({
           fullscreenTarget.classList.contains("pi-mermaid-expanded"),
       );
     };
+    const observer = new MutationObserver(syncFullscreenState);
+    observer.observe(fullscreenTarget, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    syncFullscreenState();
     document.addEventListener("fullscreenchange", syncFullscreenState);
     return () => {
+      observer.disconnect();
       document.removeEventListener("fullscreenchange", syncFullscreenState);
     };
   }, [fullscreenTarget]);

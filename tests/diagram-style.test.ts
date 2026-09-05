@@ -112,6 +112,45 @@ describe("decorateMermaidSvg", () => {
     expect(setDiagramDisplayMode(svg, "polished")).toBe("original");
   });
 
+  test("does not confuse underscore IDs and skips ambiguous endpoints", () => {
+    const svg = makeSvg(`${["B", "A", "B_C", "A_B", "C", "D"]
+      .map(
+        (id) =>
+          `<g class="node" id="pi-flowchart-${id}-0"><rect/><text>${id}</text></g>`,
+      )
+      .join("")}
+      <path class="flowchart-link" data-id="L_A_B_C_0"/>
+      <path class="flowchart-link" data-id="L_A_B_D_1"/>
+      <path class="flowchart-link" data-id="custom-edge"/>
+    `);
+    decorateMermaidSvg(svg, "flowchart-v2");
+    const cleanup = installDiagramFocus(svg);
+    svg
+      .querySelector("#pi-flowchart-B-0")
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(svg.querySelectorAll("[data-pi-related]")).toHaveLength(0);
+    svg
+      .querySelector("#pi-flowchart-A_B-0")
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(
+      svg
+        .querySelector('[data-id="L_A_B_C_0"]')
+        ?.hasAttribute("data-pi-related"),
+    ).toBe(false);
+    expect(
+      svg
+        .querySelector('[data-id="L_A_B_D_1"]')
+        ?.getAttribute("data-pi-related"),
+    ).toBe("true");
+    expect(
+      svg.querySelector("#pi-flowchart-D-0")?.getAttribute("data-pi-related"),
+    ).toBe("true");
+    expect(
+      svg.querySelector("#pi-flowchart-B-0")?.hasAttribute("data-pi-related"),
+    ).toBe(false);
+    cleanup();
+  });
+
   test("focuses a selected flowchart node and its related path", () => {
     const svg = makeSvg(`
       <g class="node default" id="render-flowchart-A-0"><rect/><text>A</text></g>

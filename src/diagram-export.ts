@@ -1,3 +1,5 @@
+import { replaceRasterLabels } from "./diagram-raster-labels.js";
+
 const MAX_EXPORT_DIMENSION = 8_192;
 const MAX_EXPORT_PIXELS = 16_000_000;
 const MAX_SERIALIZED_SVG_BYTES = 16 * 1024 * 1024;
@@ -37,14 +39,21 @@ function safeFilename(value: string, extension: string): string {
   return `${name || "mermaid-diagram"}.${extension}`;
 }
 
-function naturalSize(svg: SVGSVGElement): { height: number; width: number } {
+function naturalSize(svg: SVGSVGElement): {
+  height: number;
+  width: number;
+  x: number;
+  y: number;
+} {
   const values = (svg.getAttribute("viewBox") ?? "")
     .trim()
     .split(/[\s,]+/)
     .map(Number);
   const width = svg.viewBox?.baseVal.width || values[2] || 1;
   const height = svg.viewBox?.baseVal.height || values[3] || 1;
-  return { height, width };
+  const x = svg.viewBox?.baseVal.x ?? values[0] ?? 0;
+  const y = svg.viewBox?.baseVal.y ?? values[1] ?? 0;
+  return { height, width, x, y };
 }
 
 function copyPresentation(source: Element, target: Element): void {
@@ -57,33 +66,6 @@ function copyPresentation(source: Element, target: Element): void {
   }
   if (declarations.length > 0)
     target.setAttribute("style", declarations.join(";"));
-}
-
-function replaceForeignObjects(svg: SVGSVGElement): void {
-  for (const foreignObject of svg.querySelectorAll("foreignObject")) {
-    const textValue = foreignObject.textContent?.replace(/\s+/g, " ").trim();
-    if (!textValue) {
-      foreignObject.remove();
-      continue;
-    }
-    const x = Number.parseFloat(foreignObject.getAttribute("x") ?? "0") || 0;
-    const y = Number.parseFloat(foreignObject.getAttribute("y") ?? "0") || 0;
-    const width =
-      Number.parseFloat(foreignObject.getAttribute("width") ?? "0") || 0;
-    const height =
-      Number.parseFloat(foreignObject.getAttribute("height") ?? "0") || 0;
-    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-    const styledLabel = foreignObject.querySelector("span, p, div");
-    if (styledLabel?.getAttribute("style")) {
-      text.setAttribute("style", styledLabel.getAttribute("style") ?? "");
-    }
-    text.setAttribute("x", String(x + width / 2));
-    text.setAttribute("y", String(y + height / 2));
-    text.setAttribute("dominant-baseline", "middle");
-    text.setAttribute("text-anchor", "middle");
-    text.textContent = textValue;
-    foreignObject.replaceWith(text);
-  }
 }
 
 function isSafeReference(value: string): boolean {
@@ -141,9 +123,9 @@ export function serializeDiagramSvg(
       copyPresentation(sourceElement, cloneElement);
   }
 
+  if (rasterSafe) replaceRasterLabels(source, clone);
   sanitizeSvg(clone);
-  if (rasterSafe) replaceForeignObjects(clone);
-  const { height, width } = naturalSize(source);
+  const { height, width, x, y } = naturalSize(source);
   clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
   clone.setAttribute("width", String(width));
   clone.setAttribute("height", String(height));
@@ -165,10 +147,10 @@ export function serializeDiagramSvg(
     "rect",
   );
   background.dataset.piExportBackground = "true";
-  background.setAttribute("x", "0");
-  background.setAttribute("y", "0");
-  background.setAttribute("width", "100%");
-  background.setAttribute("height", "100%");
+  background.setAttribute("x", String(x));
+  background.setAttribute("y", String(y));
+  background.setAttribute("width", String(width));
+  background.setAttribute("height", String(height));
   background.setAttribute("fill", options.background);
   clone.prepend(background);
 

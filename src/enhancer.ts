@@ -233,6 +233,7 @@ function errorSummary(message: string): string {
 }
 
 function showRenderError(record: DiagramRecord, message: string): void {
+  visibilityObserver?.unobserve(record.card);
   record.status.remove();
   record.toolbarBrand.textContent = "Mermaid error";
   const panel = document.createElement("div");
@@ -368,7 +369,16 @@ async function toolbarAction(
       );
       return true;
     case "download-png": {
-      const png = await createPngExport(view.svg, exportOptions(record));
+      // Measure HTML labels synchronously, even while the source view is open.
+      const hidden = view.viewport.hidden;
+      let exporting: Promise<Blob>;
+      try {
+        view.viewport.hidden = false;
+        exporting = createPngExport(view.svg, exportOptions(record));
+      } finally {
+        view.viewport.hidden = hidden;
+      }
+      const png = await exporting;
       downloadDiagramBlob(png, record.diagramId, "png");
       return true;
     }
@@ -457,7 +467,9 @@ function mountRenderedDiagram(
       if (record.card.classList.contains("pi-mermaid-expanded")) {
         record.card.classList.remove("pi-mermaid-expanded");
         requestAnimationFrame(() => controller.refresh(true));
+        return true;
       }
+      return false;
     },
     onScaleChange: (percentage) => toolbarControls.setZoom(percentage),
   });
@@ -532,7 +544,13 @@ async function rerenderRecord(
 }
 
 function scheduleInitialRender(record: DiagramRecord, priority: number): void {
-  if (record.scheduled || record.rendering || record.view) return;
+  if (
+    record.scheduled ||
+    record.rendering ||
+    record.view ||
+    record.card.dataset.piMermaidState === "error"
+  )
+    return;
   record.scheduled = true;
   record.status.textContent = "Rendering diagram…";
   void renderQueue
@@ -571,6 +589,7 @@ function scheduleThemeRender(
     .enqueue((signal) => rerenderRecord(record, isDarkTheme, signal), {
       generation,
       group: "theme",
+      key: record.diagramId,
       priority: record.visible ? 100 : 0,
     })
     .catch((error) => {
@@ -592,7 +611,15 @@ const visibilityObserver =
             const record = records.get(card);
             if (!record) continue;
             record.visible = entry.isIntersecting;
-            if (entry.isIntersecting) scheduleInitialRender(record, 100);
+            if (entry.isIntersecting) {
+              scheduleInitialRender(record, 100);
+              renderQueue.reprioritize(
+                "theme",
+                themeGeneration,
+                record.diagramId,
+                100,
+              );
+            }
           }
         },
         { rootMargin: "800px 0px" },

@@ -153,6 +153,24 @@ function flowchartNodeId(node: Element): string | undefined {
   return node.id.slice(markerIndex + marker.length).replace(/-\d+$/, "");
 }
 
+function flowchartEndpoints(
+  edgeId: string,
+  nodeIds: Set<string>,
+): string[] | undefined {
+  const encoded = /^L_(.+)_\d+$/.exec(edgeId)?.[1];
+  if (!encoded) return undefined;
+  let endpoints: string[] | undefined;
+  for (const start of nodeIds) {
+    if (!encoded.startsWith(`${start}_`)) continue;
+    const end = encoded.slice(start.length + 1);
+    if (!nodeIds.has(end)) continue;
+    // Underscores are legal in both IDs. Never guess an ambiguous split.
+    if (endpoints) return undefined;
+    endpoints = [start, end];
+  }
+  return endpoints;
+}
+
 function clearFocus(svg: SVGSVGElement): void {
   svg.classList.remove("pi-mermaid-focused");
   for (const element of svg.querySelectorAll(
@@ -174,15 +192,17 @@ function focusFlowchartNode(svg: SVGSVGElement, selected: SVGElement): void {
   svg.classList.add("pi-mermaid-focused");
   selected.dataset.piSelected = "true";
 
+  const nodeIds = new Set(
+    [...svg.querySelectorAll("g.node")]
+      .map(flowchartNodeId)
+      .filter((id): id is string => !!id),
+  );
   const relatedIds = new Set([selectedId]);
   for (const edge of svg.querySelectorAll<SVGElement>("[data-pi-edge=true]")) {
-    const edgeId = edge.dataset.id ?? "";
-    if (!edgeId.includes(`_${selectedId}_`)) continue;
+    const endpoints = flowchartEndpoints(edge.dataset.id ?? "", nodeIds);
+    if (!endpoints?.includes(selectedId)) continue;
     edge.dataset.piRelated = "true";
-    for (const node of svg.querySelectorAll<SVGElement>("g.node")) {
-      const nodeId = flowchartNodeId(node);
-      if (nodeId && edgeId.includes(`_${nodeId}_`)) relatedIds.add(nodeId);
-    }
+    for (const id of endpoints) relatedIds.add(id);
   }
   for (const node of svg.querySelectorAll<SVGElement>("g.node")) {
     const nodeId = flowchartNodeId(node);

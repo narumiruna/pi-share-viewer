@@ -1,6 +1,7 @@
 export interface DiagramRenderTaskOptions {
   generation?: number;
   group?: string;
+  key?: string;
   priority?: number;
 }
 
@@ -8,6 +9,7 @@ interface QueuedTask {
   controller: AbortController;
   generation: number;
   group: string;
+  key?: string;
   priority: number;
   reject: (reason?: unknown) => void;
   resolve: (value: unknown) => void;
@@ -41,6 +43,7 @@ export class DiagramRenderQueue {
         controller: new AbortController(),
         generation: options.generation ?? 0,
         group: options.group ?? "default",
+        key: options.key,
         priority: options.priority ?? 0,
         reject,
         resolve: (value) => resolve(value as T),
@@ -52,6 +55,26 @@ export class DiagramRenderQueue {
       );
       this.#drain();
     });
+  }
+
+  reprioritize(
+    group: string,
+    generation: number,
+    key: string,
+    priority: number,
+  ): boolean {
+    const task = this.#pending.find(
+      (candidate) =>
+        candidate.group === group &&
+        candidate.generation === generation &&
+        candidate.key === key,
+    );
+    if (!task || priority <= task.priority) return false;
+    task.priority = priority;
+    this.#pending.sort(
+      (a, b) => b.priority - a.priority || a.sequence - b.sequence,
+    );
+    return true;
   }
 
   cancelOlder(group: string, generation: number): void {
@@ -83,18 +106,24 @@ export class DiagramRenderQueue {
     for (const task of this.#active) task.controller.abort(reason);
   }
 
+  async #run(task: QueuedTask): Promise<void> {
+    try {
+      task.controller.signal.throwIfAborted();
+      task.resolve(await task.run(task.controller.signal));
+    } catch (error) {
+      task.reject(error);
+    } finally {
+      this.#active.delete(task);
+      this.#drain();
+    }
+  }
+
   #drain(): void {
     while (this.#active.size < this.concurrency) {
       const task = this.#pending.shift();
       if (!task) return;
       this.#active.add(task);
-      void task
-        .run(task.controller.signal)
-        .then(task.resolve, task.reject)
-        .finally(() => {
-          this.#active.delete(task);
-          this.#drain();
-        });
+      void this.#run(task);
     }
   }
 }

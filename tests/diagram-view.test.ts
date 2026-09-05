@@ -67,6 +67,34 @@ describe("diagram view", () => {
     view.destroy();
   });
 
+  test.each([
+    [4_000, 1_000, 0.1],
+    [1_000, 4_000, 0.05],
+  ])(
+    "fits a %s by %s diagram below the manual zoom floor",
+    (width, height, scale) => {
+      const { stage, viewport } = makeView(400, 200, width, height);
+      const view = createDiagramView(viewport, stage);
+      expect(view.getState().scale).toBe(scale);
+      view.zoomBy(0.8);
+      expect(view.getState().scale).toBe(scale);
+      view.zoomBy(10);
+      view.fit();
+      expect(view.getState().scale).toBe(scale);
+      Object.defineProperty(viewport, "clientWidth", { value: 200 });
+      Object.defineProperty(viewport, "clientHeight", { value: 100 });
+      view.refresh();
+      expect(view.getState().scale).toBe(scale / 2);
+      expect(
+        view.getState().naturalWidth * view.getState().scale,
+      ).toBeLessThanOrEqual(200);
+      expect(
+        view.getState().naturalHeight * view.getState().scale,
+      ).toBeLessThanOrEqual(100);
+      view.destroy();
+    },
+  );
+
   test("zooms around the requested client point", () => {
     const { stage, viewport } = makeView();
     const view = createDiagramView(viewport, stage);

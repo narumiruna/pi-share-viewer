@@ -68,6 +68,48 @@ describe("DiagramRenderQueue", () => {
     expect(order).toEqual(["first", "high", "low"]);
   });
 
+  test("releases slots after synchronous failures in immediate and pending tasks", async () => {
+    const queue = new DiagramRenderQueue(1);
+    const fail = () => {
+      throw new Error("sync failure");
+    };
+    const immediate = queue.enqueue(fail);
+    await expect(immediate).rejects.toThrow("sync failure");
+    const gate = deferred<string>();
+    const active = queue.enqueue(() => gate.promise);
+    const pending = queue.enqueue(fail);
+    const next = queue.enqueue(async () => "continued");
+    const settled = Promise.allSettled([active, pending, next]);
+    gate.resolve("active");
+    expect(await settled).toMatchObject([
+      { status: "fulfilled", value: "active" },
+      { status: "rejected", reason: { message: "sync failure" } },
+      { status: "fulfilled", value: "continued" },
+    ]);
+  });
+
+  test("promotes the matching pending task without duplicating or cancelling work", async () => {
+    const queue = new DiagramRenderQueue(1);
+    const gate = deferred<string>();
+    const active = queue.enqueue(() => gate.promise);
+    const order: string[] = [];
+    const tasks = ["offscreen", "visible"].map((key) =>
+      queue.enqueue(
+        async () => {
+          order.push(key);
+          return key;
+        },
+        { group: "theme", generation: 2, key },
+      ),
+    );
+    expect(queue.reprioritize("theme", 1, "visible", 100)).toBe(false);
+    expect(queue.reprioritize("initial", 2, "visible", 100)).toBe(false);
+    expect(queue.reprioritize("theme", 2, "visible", 100)).toBe(true);
+    gate.resolve("active");
+    await Promise.all([active, ...tasks]);
+    expect(order).toEqual(["visible", "offscreen"]);
+  });
+
   test("aborts stale pending and active generations", async () => {
     const queue = new DiagramRenderQueue(1);
     const active = queue.enqueue(

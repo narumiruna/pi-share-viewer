@@ -9,7 +9,7 @@ import {
 
 function makeSvg(): SVGSVGElement {
   document.body.innerHTML = `
-    <svg viewBox="0 0 200 100" role="graphics-document" aria-labelledby="title">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100" role="graphics-document" aria-labelledby="title">
       <title id="title">Viewer flow</title>
       <script>globalThis.bad = true</script>
       <animate attributeName="href" values="#safe;https://example.com" />
@@ -44,7 +44,7 @@ describe("diagram export", () => {
     expect(output).not.toContain("https://example.com");
   });
 
-  test("replaces foreignObject labels in raster-safe output", () => {
+  test("reports unavailable label layout rather than exporting flattened text", () => {
     const svg = makeSvg();
     const label = document.createElementNS(
       "http://www.w3.org/2000/svg",
@@ -55,14 +55,13 @@ describe("diagram export", () => {
     label.innerHTML = '<div xmlns="http://www.w3.org/1999/xhtml">Label</div>';
     svg.append(label);
 
-    const output = serializeDiagramSvg(
-      svg,
-      { background: "#fff", title: "Viewer flow" },
-      true,
-    );
-
-    expect(output).not.toContain("foreignObject");
-    expect(output).toContain(">Label</text>");
+    expect(() =>
+      serializeDiagramSvg(
+        svg,
+        { background: "#fff", title: "Viewer flow" },
+        true,
+      ),
+    ).toThrow("Show the diagram before exporting PNG labels");
   });
 
   test("revokes temporary download URLs without retaining anchors", () => {
@@ -82,6 +81,24 @@ describe("diagram export", () => {
     expect(document.querySelector('a[download="viewer-flow.svg"]')).toBeNull();
     vi.runAllTimers();
     expect(revokeObjectUrl).toHaveBeenCalledWith("blob:diagram");
+  });
+
+  test.each([
+    [-8, -8],
+    [20, 30],
+  ])("covers a viewBox with origin %s,%s", (x, y) => {
+    const svg = makeSvg();
+    svg.setAttribute("viewBox", `${x} ${y} 356 120`);
+    const output = serializeDiagramSvg(svg, {
+      background: "#fff",
+      title: "Offset",
+    });
+    const doc = new DOMParser().parseFromString(output, "image/svg+xml");
+    const background = doc.querySelector("[data-pi-export-background]");
+    expect(background?.getAttribute("x")).toBe(String(x));
+    expect(background?.getAttribute("y")).toBe(String(y));
+    expect(background?.getAttribute("width")).toBe("356");
+    expect(background?.getAttribute("height")).toBe("120");
   });
 
   test("creates an SVG image blob", async () => {
