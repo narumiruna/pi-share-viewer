@@ -11,12 +11,12 @@
     "types": ["node"]
   },
   "include": [
+    "build",
     "src",
     "tests",
     "playwright.config.ts",
     "vite.config.ts",
-    "vite.enhancer.config.ts",
-    "vite.renderer.config.ts",
+    "vite.runtime.config.ts",
     "vitest.config.ts"
   ]
 }
