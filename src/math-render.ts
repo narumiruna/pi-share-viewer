@@ -34,8 +34,12 @@ export class MathBudget {
 /** Failure is local: the original delimited source remains visible. */
 export function renderMath(element: HTMLElement, budget: MathBudget): void {
   const raw = element.textContent ?? "";
-  const math = readMath(raw.trimStart());
-  if (!math || math.raw !== raw.trimStart()) {
+  // Marked can append a trailing newline to block tokens in loose lists.
+  // Ignore surrounding whitespace only for recognition; retain the original
+  // source for failure fallback and byte-budget accounting.
+  const source = raw.trim();
+  const math = readMath(source);
+  if (!math || math.raw !== source) {
     element.dataset.piMathState = "error";
     return;
   }
