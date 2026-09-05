@@ -21,6 +21,9 @@ import {
   createDiagramView,
   type DiagramViewController,
 } from "./diagram-view.js";
+import { MathRenderer } from "./math-render.js";
+import { createMathParser, type PiMarkdownParser } from "./math-source.js";
+import { installMathStyle } from "./math-style.js";
 import {
   getMermaidLimitError,
   MAX_RENDERED_SVG_BYTES,
@@ -53,6 +56,22 @@ document.documentElement.dataset.piMermaidTheme = isDarkTheme
   ? "dark"
   : "light";
 installSessionStyle();
+installMathStyle();
+const mathRenderer = new MathRenderer();
+const upstreamMarkdown = (
+  globalThis as typeof globalThis & { marked?: PiMarkdownParser }
+).marked;
+if (
+  typeof upstreamMarkdown?.parse === "function" &&
+  typeof upstreamMarkdown.parseInline === "function" &&
+  upstreamMarkdown.defaults
+) {
+  Object.defineProperty(globalThis, "__PI_MATH_PARSE__", {
+    value: createMathParser(upstreamMarkdown),
+    writable: false,
+    configurable: false,
+  });
+}
 
 interface RenderedDiagram {
   dark: boolean;
@@ -753,6 +772,7 @@ function scanEntry(entry: HTMLElement): void {
 
 function scan(): void {
   scanQueued = false;
+  mathRenderer.scan(document);
   for (const entry of document.querySelectorAll<HTMLElement>(
     '[id^="entry-"]',
   )) {
@@ -805,6 +825,7 @@ window.addEventListener(
   "pagehide",
   () => {
     mutationObserver.disconnect();
+    mathRenderer.destroy();
     visibilityObserver?.disconnect();
     renderQueue.destroy();
     for (const record of records.values()) {
