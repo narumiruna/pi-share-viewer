@@ -134,6 +134,22 @@ http://localhost:5173/session/#<gist-id>&leafId=<entry-id>&targetId=<entry-id>
 
 The local HTTP exception is restricted to loopback hosts. Production viewer origins must use HTTPS.
 
+## Deploy with GitHub Pages
+
+The included `.github/workflows/deploy-pages.yml` workflow publishes `dist/` after every push to `main`. It derives Vite's base path from the repository name, so both project sites such as `https://<owner>.github.io/pi-share-viewer/` and root sites named `<owner>.github.io` work without source changes.
+
+1. Push the repository to GitHub.
+2. In **Settings → Pages → Build and deployment**, select **GitHub Actions** as the source.
+3. Run **Deploy GitHub Pages** from the Actions tab, or push to `main`.
+4. Set Pi's viewer URL to the deployed session path, including the trailing slash:
+
+   ```bash
+   export PI_SHARE_VIEWER_URL="https://<owner>.github.io/<repository>/session/"
+   pi
+   ```
+
+For this repository, the expected URL is `https://narumiruna.github.io/pi-share-viewer/session/`. GitHub Pages only hosts the static viewer; browser requests to the unauthenticated GitHub Gist API remain subject to GitHub's rate limits.
+
 ## Deploy with Docker Compose
 
 Build and start the static Nginx service:
@@ -192,7 +208,7 @@ npm run ci
 
 `npm run test:e2e` creates a real Pi HTML export from `tests/fixtures/session.jsonl`, then intercepts GitHub requests. Automated tests do not create, read, or delete real Gists.
 
-CI intentionally runs only the Web test job. It statically checks the Docker, Compose, and Nginx configuration but does not build or start the container; verify the deployment commands above in a Docker environment before production use.
+The CI workflow intentionally runs only the Web test job. It statically checks the Docker, Compose, and Nginx configuration but does not build or start the container; verify the deployment commands above in a Docker environment before production use. The separate Pages workflow builds and publishes the static site.
 
 Browser support:
 
@@ -208,6 +224,7 @@ index.html                 Landing page
 Dockerfile                 Multi-stage production image
 nginx.conf                 Static routes, caching, and security headers
 compose.yaml               Self-hosted deployment
+.github/workflows/         CI and GitHub Pages deployment
 vite.config.ts             Static application build
 vite.enhancer.config.ts    Bundled session enhancer build
 vite.renderer.config.ts    Isolated Mermaid renderer build

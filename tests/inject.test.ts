@@ -43,6 +43,20 @@ describe("session enhancement injection", () => {
     );
   });
 
+  test("preserves a GitHub Pages base path in shared links", () => {
+    const output = injectMermaidEnhancer(
+      SESSION_HTML,
+      "runtime",
+      "renderer",
+      GIST_ID,
+      "https://narumiruna.github.io/pi-share-viewer/",
+    );
+
+    expect(output).toContain(
+      `https://narumiruna.github.io/pi-share-viewer/session/#${GIST_ID}`,
+    );
+  });
+
   test("appends the runtime after scripts containing body-like text", () => {
     const sessionWithTemplate = SESSION_HTML.replace(
       "</body>",

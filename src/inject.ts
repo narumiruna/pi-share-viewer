@@ -31,7 +31,7 @@ export function injectMermaidEnhancer(
   enhancerSource: string,
   rendererSource: string,
   gistId: string,
-  viewerOrigin: string,
+  viewerBaseUrl: string,
   theme?: SiteTheme,
   urlParams = "",
 ): string {
@@ -48,13 +48,13 @@ export function injectMermaidEnhancer(
     throw new Error("Invalid Gist ID.");
   }
 
-  const origin = new URL(viewerOrigin);
+  const baseUrl = new URL(viewerBaseUrl);
   const isLoopback = ["localhost", "127.0.0.1", "[::1]"].includes(
-    origin.hostname,
+    baseUrl.hostname,
   );
   if (
-    origin.protocol !== "https:" &&
-    !(origin.protocol === "http:" && isLoopback)
+    baseUrl.protocol !== "https:" &&
+    !(baseUrl.protocol === "http:" && isLoopback)
   ) {
     throw new Error("Viewer origin must use HTTPS.");
   }
@@ -71,9 +71,9 @@ export function injectMermaidEnhancer(
   policy.httpEquiv = "Content-Security-Policy";
   policy.content = CHILD_CSP;
 
-  const baseUrl = document.createElement("meta");
-  baseUrl.name = "pi-share-base-url";
-  baseUrl.content = `${origin.origin}/session/#${gistId.toLowerCase()}`;
+  const shareUrl = document.createElement("meta");
+  shareUrl.name = "pi-share-base-url";
+  shareUrl.content = new URL(`session/#${gistId.toLowerCase()}`, baseUrl).href;
 
   const deepLinkParams = document.createElement("meta");
   deepLinkParams.name = "pi-url-params";
@@ -86,7 +86,7 @@ export function injectMermaidEnhancer(
     `${rendererConfig}${themeConfig}${enhancerSource}`,
   );
 
-  document.head.prepend(policy, baseUrl, deepLinkParams);
+  document.head.prepend(policy, shareUrl, deepLinkParams);
   document.body.append(runtime);
   return `<!doctype html>\n${document.documentElement.outerHTML}`;
 }

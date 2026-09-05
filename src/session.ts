@@ -53,10 +53,17 @@ export async function loadViewer(): Promise<void> {
 
   try {
     const { gistId, urlParams } = parseSessionHash(window.location.hash);
+    const viewerBaseUrl = new URL("../", window.location.href);
     const [sessionHtml, enhancerSource, rendererSource] = await Promise.all([
       loadSessionHtml(gistId, { signal: controller.signal }),
-      loadRuntimeSource("/assets/mermaid-enhancer.js", controller.signal),
-      loadRuntimeSource("/assets/mermaid-renderer.js", controller.signal),
+      loadRuntimeSource(
+        new URL("assets/mermaid-enhancer.js", viewerBaseUrl).href,
+        controller.signal,
+      ),
+      loadRuntimeSource(
+        new URL("assets/mermaid-renderer.js", viewerBaseUrl).href,
+        controller.signal,
+      ),
     ]);
     if (sequence !== loadSequence) return;
 
@@ -65,7 +72,7 @@ export async function loadViewer(): Promise<void> {
       enhancerSource,
       rendererSource,
       gistId,
-      window.location.origin,
+      viewerBaseUrl.href,
       getSavedTheme(),
       urlParams,
     );

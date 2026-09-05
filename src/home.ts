@@ -94,7 +94,7 @@ function installCopyButtons(): void {
   }
 }
 
-const sessionUrl = new URL("/session/", window.location.origin);
+const sessionUrl = new URL("session/", document.baseURI);
 requiredElement<HTMLElement>("setup-command").textContent =
   `export PI_SHARE_VIEWER_URL="${sessionUrl.href}"\npi`;
 
