@@ -27,21 +27,18 @@ jobs:
         with:
           node-version: 26
           cache: npm
-      - uses: actions/configure-pages@v5
+      - name: Configure GitHub Pages
+        id: pages
+        uses: actions/configure-pages@v5
       - run: npm ci
       - run: npm run check
       - run: npm test
       - run: npm run typecheck
-      - name: Build for the repository URL
+      - name: Build for the Pages URL
         shell: bash
         run: |
-          repository_name="${GITHUB_REPOSITORY#*/}"
-          if [[ "$repository_name" == "${GITHUB_REPOSITORY_OWNER}.github.io" ]]; then
-            base_path="/"
-          else
-            base_path="/$repository_name/"
-          fi
-          npm run build -- --base="$base_path"
+          base_path="${{ steps.pages.outputs.base_path }}"
+          npm run build -- --base="${base_path%/}/"
       - uses: actions/upload-pages-artifact@v4
         with:
           path: dist
