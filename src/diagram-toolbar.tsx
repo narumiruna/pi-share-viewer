@@ -164,9 +164,6 @@ function DiagramToolbar({
         aria-label="Diagram controls"
         className="pi-mermaid-controls"
       >
-        <Toolbar.Separator className="pi-mermaid-group-label" decorative>
-          View
-        </Toolbar.Separator>
         <fieldset
           aria-label="Diagram view"
           className="pi-mermaid-control-group"
@@ -192,84 +189,71 @@ function DiagramToolbar({
             label="Fit diagram"
             onAction={onAction}
           />
-          <Control
-            action="reset"
-            icon={ResetIcon}
-            label="Reset view"
-            onAction={onAction}
-          />
         </fieldset>
 
-        <Toolbar.Separator className="pi-mermaid-group-label" decorative>
-          Inspect
-        </Toolbar.Separator>
-        <fieldset
-          aria-label="Diagram inspection"
-          className="pi-mermaid-control-group"
+        <div
+          id={`${fullscreenTarget.id}-actions`}
+          className={`pi-mermaid-secondary${moreOpen ? " is-open" : ""}`}
         >
-          <Tooltip.Root>
-            <Tooltip.Trigger asChild>
-              <Toggle.Root
-                aria-label="Trace edges"
-                className="pi-mermaid-control"
-                disabled={!polishSupported}
-                onPressedChange={(pressed) => {
-                  setTracing(pressed);
-                  void onAction("trace", pressed);
-                }}
-                pressed={tracing}
-              >
-                <ActivityLogIcon />
-              </Toggle.Root>
-            </Tooltip.Trigger>
-            <Tooltip.Portal>
-              <Tooltip.Content
-                className="pi-mermaid-tooltip"
-                side="bottom"
-                sideOffset={7}
-              >
-                Trace edges
-              </Tooltip.Content>
-            </Tooltip.Portal>
-          </Tooltip.Root>
-          <Control
-            action="fullscreen"
-            icon={expanded ? ExitFullScreenIcon : EnterFullScreenIcon}
-            label={expanded ? "Close fullscreen" : "Open fullscreen"}
-            onAction={() => toggleFullscreen()}
-          />
-          <Toolbar.Button
-            aria-expanded={moreOpen}
-            aria-label="More diagram actions"
-            className="pi-mermaid-control pi-mermaid-more"
-            onClick={() => setMoreOpen((open) => !open)}
+          <fieldset
+            aria-label="Reset diagram view"
+            className="pi-mermaid-control-group"
           >
-            <DotsHorizontalIcon />
-          </Toolbar.Button>
-        </fieldset>
-
-        <Toolbar.Separator className="pi-mermaid-group-label" decorative>
-          Actions
-        </Toolbar.Separator>
-        <fieldset
-          aria-label="Diagram actions"
-          className={`pi-mermaid-control-group pi-mermaid-secondary${moreOpen ? " is-open" : ""}`}
-        >
-          {polishSupported ? (
+            <Control
+              action="reset"
+              icon={ResetIcon}
+              label="Reset view"
+              onAction={onAction}
+            />
+          </fieldset>
+          <Toolbar.Separator className="pi-mermaid-group-label" decorative>
+            Presentation
+          </Toolbar.Separator>
+          <fieldset
+            aria-label="Diagram presentation"
+            className="pi-mermaid-control-group"
+          >
+            {polishSupported ? (
+              <Tooltip.Root>
+                <Tooltip.Trigger asChild>
+                  <Toggle.Root
+                    aria-label={
+                      polished ? "Use original style" : "Use polished style"
+                    }
+                    className="pi-mermaid-control"
+                    onPressedChange={async (pressed) => {
+                      const active = await onAction("display-mode", pressed);
+                      if (typeof active === "boolean") setPolished(active);
+                    }}
+                    pressed={polished}
+                  >
+                    <MixerHorizontalIcon />
+                  </Toggle.Root>
+                </Tooltip.Trigger>
+                <Tooltip.Portal>
+                  <Tooltip.Content
+                    className="pi-mermaid-tooltip"
+                    side="bottom"
+                    sideOffset={7}
+                  >
+                    {polished ? "Use original style" : "Use polished style"}
+                  </Tooltip.Content>
+                </Tooltip.Portal>
+              </Tooltip.Root>
+            ) : null}
             <Tooltip.Root>
               <Tooltip.Trigger asChild>
                 <Toggle.Root
-                  aria-label={
-                    polished ? "Use original style" : "Use polished style"
-                  }
+                  aria-label="Trace edges"
                   className="pi-mermaid-control"
-                  onPressedChange={async (pressed) => {
-                    const active = await onAction("display-mode", pressed);
-                    if (typeof active === "boolean") setPolished(active);
+                  disabled={!polishSupported}
+                  onPressedChange={(pressed) => {
+                    setTracing(pressed);
+                    void onAction("trace", pressed);
                   }}
-                  pressed={polished}
+                  pressed={tracing}
                 >
-                  <MixerHorizontalIcon />
+                  <ActivityLogIcon />
                 </Toggle.Root>
               </Tooltip.Trigger>
               <Tooltip.Portal>
@@ -278,64 +262,98 @@ function DiagramToolbar({
                   side="bottom"
                   sideOffset={7}
                 >
-                  {polished ? "Use original style" : "Use polished style"}
+                  Trace edges
                 </Tooltip.Content>
               </Tooltip.Portal>
             </Tooltip.Root>
-          ) : null}
-          <Tooltip.Root>
-            <Tooltip.Trigger asChild>
-              <Toolbar.Button
-                aria-controls={`${fullscreenTarget.id}-source`}
-                aria-label={sourceVisible ? "Show diagram" : "Show source"}
-                aria-pressed={sourceVisible}
-                className="pi-mermaid-control"
-                onClick={() => void toggleSource()}
-              >
-                {sourceVisible ? <EyeOpenIcon /> : <CodeIcon />}
-              </Toolbar.Button>
-            </Tooltip.Trigger>
-            <Tooltip.Portal>
-              <Tooltip.Content
-                className="pi-mermaid-tooltip"
-                side="bottom"
-                sideOffset={7}
-              >
-                {sourceVisible ? "Show diagram" : "Show source"}
-              </Tooltip.Content>
-            </Tooltip.Portal>
-          </Tooltip.Root>
-          <Control
-            action="copy-source"
-            icon={CopyIcon}
-            label="Copy source"
-            onAction={() => runFeedback("copy-source", "Source copied")}
-          />
-          <Control
-            action="copy-svg"
-            icon={CheckIcon}
-            label="Copy SVG"
-            onAction={() => runFeedback("copy-svg", "SVG copied")}
-          />
-          <Control
-            action="download-svg"
-            icon={DownloadIcon}
-            label="Download SVG"
-            onAction={() => runFeedback("download-svg", "SVG downloaded")}
-          />
-          <Control
-            action="download-png"
-            icon={ImageIcon}
-            label="Download PNG"
-            onAction={() => runFeedback("download-png", "PNG downloaded")}
-          />
-          <Control
-            action="copy-link"
-            icon={Link2Icon}
-            label="Copy diagram link"
-            onAction={() => runFeedback("copy-link", "Diagram link copied")}
-          />
-        </fieldset>
+          </fieldset>
+          <Toolbar.Separator className="pi-mermaid-group-label" decorative>
+            Source
+          </Toolbar.Separator>
+          <fieldset
+            aria-label="Diagram source"
+            className="pi-mermaid-control-group"
+          >
+            <Tooltip.Root>
+              <Tooltip.Trigger asChild>
+                <Toolbar.Button
+                  aria-controls={`${fullscreenTarget.id}-source`}
+                  aria-label={sourceVisible ? "Show diagram" : "Show source"}
+                  aria-pressed={sourceVisible}
+                  className="pi-mermaid-control"
+                  onClick={() => void toggleSource()}
+                >
+                  {sourceVisible ? <EyeOpenIcon /> : <CodeIcon />}
+                </Toolbar.Button>
+              </Tooltip.Trigger>
+              <Tooltip.Portal>
+                <Tooltip.Content
+                  className="pi-mermaid-tooltip"
+                  side="bottom"
+                  sideOffset={7}
+                >
+                  {sourceVisible ? "Show diagram" : "Show source"}
+                </Tooltip.Content>
+              </Tooltip.Portal>
+            </Tooltip.Root>
+            <Control
+              action="copy-source"
+              icon={CopyIcon}
+              label="Copy source"
+              onAction={() => runFeedback("copy-source", "Source copied")}
+            />
+          </fieldset>
+          <Toolbar.Separator className="pi-mermaid-group-label" decorative>
+            Share and export
+          </Toolbar.Separator>
+          <fieldset
+            aria-label="Diagram sharing and export"
+            className="pi-mermaid-control-group"
+          >
+            <Control
+              action="copy-link"
+              icon={Link2Icon}
+              label="Copy diagram link"
+              onAction={() => runFeedback("copy-link", "Diagram link copied")}
+            />
+            <Control
+              action="copy-svg"
+              icon={CheckIcon}
+              label="Copy SVG"
+              onAction={() => runFeedback("copy-svg", "SVG copied")}
+            />
+            <Control
+              action="download-svg"
+              icon={DownloadIcon}
+              label="Download SVG"
+              onAction={() => runFeedback("download-svg", "SVG downloaded")}
+            />
+            <Control
+              action="download-png"
+              icon={ImageIcon}
+              label="Download PNG"
+              onAction={() => runFeedback("download-png", "PNG downloaded")}
+            />
+          </fieldset>
+        </div>
+        <Toolbar.Separator className="pi-mermaid-group-label" decorative>
+          Fullscreen
+        </Toolbar.Separator>
+        <Control
+          action="fullscreen"
+          icon={expanded ? ExitFullScreenIcon : EnterFullScreenIcon}
+          label={expanded ? "Close fullscreen" : "Open fullscreen"}
+          onAction={() => toggleFullscreen()}
+        />
+        <Toolbar.Button
+          aria-controls={`${fullscreenTarget.id}-actions`}
+          aria-expanded={moreOpen}
+          aria-label="More diagram actions"
+          className="pi-mermaid-control pi-mermaid-more"
+          onClick={() => setMoreOpen((open) => !open)}
+        >
+          <DotsHorizontalIcon />
+        </Toolbar.Button>
         <span aria-live="polite" className="pi-mermaid-live">
           {status}
         </span>

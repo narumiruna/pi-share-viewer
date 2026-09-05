@@ -603,8 +603,6 @@ test("renders safely at mobile and desktop sizes in dark and light sessions", as
       "Zoom out",
       "Zoom in",
       "Fit diagram",
-      "Reset view",
-      "Trace edges",
       "Open fullscreen",
     ]) {
       await expect(
@@ -617,6 +615,8 @@ test("renders safely at mobile and desktop sizes in dark and light sessions", as
         .click();
     }
     for (const control of [
+      "Reset view",
+      "Trace edges",
       "Show source",
       "Copy source",
       "Copy SVG",

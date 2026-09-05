@@ -34,6 +34,7 @@ const DIAGRAM_CSS = `
 .pi-mermaid-toolbar button[aria-pressed="true"], .pi-mermaid-toolbar button[data-state="on"] { background: color-mix(in srgb, #2dd4bf 12%, var(--pi-diagram-panel)); color: #2dd4bf; }
 .pi-mermaid-zoom { min-width: 2.8rem; color: var(--pi-diagram-muted); text-align: center; font: 500 .65rem/1 ui-monospace, SFMono-Regular, Consolas, monospace; }
 .pi-mermaid-more { display: none !important; }
+.pi-mermaid-secondary { display: contents; }
 .pi-mermaid-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .pi-mermaid-inline-status { max-width: 18rem; overflow: hidden; color: var(--pi-diagram-muted); font: 500 .65rem/1.2 ui-monospace, SFMono-Regular, Consolas, monospace; text-overflow: ellipsis; white-space: nowrap; }
 .pi-mermaid-tooltip { z-index: 2147483647; border: 1px solid var(--pi-diagram-border); border-radius: .25rem; background: var(--pi-diagram-panel-soft); color: var(--pi-diagram-text); padding: .35rem .45rem; font: 500 .7rem/1 ui-monospace, SFMono-Regular, Consolas, monospace; }
@@ -94,7 +95,7 @@ const DIAGRAM_CSS = `
   .pi-mermaid-toolbar button { width: 2.75rem; min-width: 2.75rem; height: 2.75rem; min-height: 2.75rem; }
   .pi-mermaid-group-label { display: none; }
   .pi-mermaid-more { display: inline-grid !important; }
-  .pi-mermaid-secondary { display: none; position: absolute; z-index: 5; top: calc(100% + .35rem); right: 0; max-width: calc(100vw - 2rem); flex-wrap: wrap; justify-content: flex-end; border: 1px solid var(--pi-diagram-border); border-radius: .35rem; background: var(--pi-diagram-panel-soft); padding: .35rem; box-shadow: 0 8px 24px rgb(0 0 0 / 18%); }
+  .pi-mermaid-secondary { display: none; position: absolute; z-index: 5; top: calc(100% + .35rem); right: 0; width: max-content; max-width: 100%; box-sizing: border-box; flex-wrap: wrap; gap: .35rem; border: 1px solid var(--pi-diagram-border); border-radius: .35rem; background: var(--pi-diagram-panel-soft); padding: .35rem; box-shadow: 0 8px 24px rgb(0 0 0 / 18%); }
   .pi-mermaid-secondary.is-open { display: flex; }
 }
 `;
