@@ -1,0 +1,81 @@
+.viewer-page {
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+.state-panel {
+  display: grid;
+  min-height: 100vh;
+  place-content: center;
+  justify-items: center;
+  padding: 2rem;
+  background: radial-gradient(
+    ellipse at 50% 40%,
+    var(--page-glow),
+    transparent 65%
+  );
+}
+
+.state-panel > p {
+  margin-top: 1.25rem;
+  color: var(--slate-11);
+  font-size: 0.9rem;
+}
+
+.state-panel[hidden],
+.preview-frame[hidden] {
+  display: none;
+}
+
+.spinner {
+  width: 2rem;
+  height: 2rem;
+  border: 2px solid var(--slate-6);
+  border-top-color: var(--teal-9);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.error-card {
+  width: min(100%, 34rem);
+  border: 1px solid var(--slate-6);
+  border-radius: 1rem;
+  background: var(--surface);
+  padding: clamp(1.5rem, 5vw, 2.5rem);
+  box-shadow: var(--card-shadow);
+}
+
+.error-card h1 {
+  margin: 0 0 0.75rem;
+  font-size: 1.75rem;
+  letter-spacing: -0.04em;
+}
+
+.error-card p {
+  color: var(--slate-11);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.error-card a {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  color: var(--teal-11);
+  text-underline-offset: 0.25em;
+}
+
+.preview-frame {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--slate-1);
+}

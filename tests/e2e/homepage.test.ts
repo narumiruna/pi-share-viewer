@@ -1,60 +1,105 @@
 import { expect, test } from "@playwright/test";
 
 const viewports = [
+  { name: "small mobile", width: 320, height: 740 },
   { name: "mobile", width: 390, height: 844 },
+  { name: "tablet", width: 820, height: 1180 },
   { name: "desktop", width: 1440, height: 900 },
 ] as const;
 
-for (const viewport of viewports) {
-  test(`presents the homepage clearly on ${viewport.name}`, async ({
-    page,
-  }) => {
-    await page.setViewportSize(viewport);
-    await page.goto("/");
-    const sessionUrl = new URL("/session/", page.url());
+for (const colorScheme of ["dark", "light"] as const) {
+  for (const viewport of viewports) {
+    test(`presents the homepage clearly on ${viewport.name} in ${colorScheme} mode`, async ({
+      page,
+    }, testInfo) => {
+      await page.emulateMedia({ colorScheme });
+      await page.setViewportSize(viewport);
+      await page.goto("/");
+      const sessionUrl = new URL("/session/", page.url());
 
-    await expect(page).toHaveTitle("Pi Share Viewer");
-    await expect(
-      page.getByRole("heading", {
-        level: 1,
-        name: "Share Pi sessions.",
-      }),
-    ).toBeVisible();
-    await expect(page.locator(".hero-lead")).toHaveText(
-      "A self-hosted viewer for /share.",
-    );
-    const sharingPreview = page.getByRole("img", {
-      name: "Example Pi GitHub fallback sharing workflow",
+      await expect(page).toHaveTitle("Pi Share Viewer");
+      await expect(
+        page.getByRole("heading", {
+          level: 1,
+          name: "Share Pi sessions.",
+        }),
+      ).toBeVisible();
+      await expect(page.locator(".hero-lead")).toHaveText(
+        "A self-hosted viewer for /share.",
+      );
+      const sharingPreview = page.getByRole("img", {
+        name: "Example Pi GitHub fallback sharing workflow",
+      });
+      await expect(sharingPreview).toBeVisible();
+      await expect(sharingPreview).toContainText("GitHub fallback");
+      await expect(
+        page.getByRole("link", { name: "View Pi Share Viewer on GitHub" }),
+      ).toHaveAttribute(
+        "href",
+        "https://github.com/narumiruna/pi-share-viewer",
+      );
+      await expect(
+        page.getByRole("button", { name: /Switch to (dark|light) theme/ }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("heading", {
+          level: 2,
+          name: "Setup",
+        }),
+      ).toBeVisible();
+      await expect(page.getByText("PI_SHARE_VIEWER_URL")).toContainText(
+        `export PI_SHARE_VIEWER_URL="${sessionUrl.href}"`,
+      );
+      await expect(
+        page.getByText("Secret Gists are unlisted, not private."),
+      ).toBeVisible();
+
+      const hasHorizontalOverflow = await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth >
+          document.documentElement.clientWidth,
+      );
+      expect(hasHorizontalOverflow).toBe(false);
+      await expect(page.locator("html")).toHaveClass(new RegExp(colorScheme));
+      await expect(
+        page
+          .getByRole("region", { name: "Viewer features" })
+          .getByRole("heading"),
+      ).toHaveCount(3);
+      for (const button of await page.getByRole("button").all()) {
+        const bounds = await button.boundingBox();
+        expect(bounds?.height).toBeGreaterThanOrEqual(44);
+      }
+      await page.screenshot({
+        path: testInfo.outputPath("homepage.png"),
+        fullPage: true,
+      });
     });
-    await expect(sharingPreview).toBeVisible();
-    await expect(sharingPreview).toContainText("GitHub fallback");
-    await expect(
-      page.getByRole("link", { name: "View Pi Share Viewer on GitHub" }),
-    ).toHaveAttribute("href", "https://github.com/narumiruna/pi-share-viewer");
-    await expect(
-      page.getByRole("button", { name: /Switch to (dark|light) theme/ }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("heading", {
-        level: 2,
-        name: "Setup",
-      }),
-    ).toBeVisible();
-    await expect(page.getByText("PI_SHARE_VIEWER_URL")).toContainText(
-      `export PI_SHARE_VIEWER_URL="${sessionUrl.href}"`,
-    );
-    await expect(
-      page.getByText("Secret Gists are unlisted, not private."),
-    ).toBeVisible();
-
-    const hasHorizontalOverflow = await page.evaluate(
-      () =>
-        document.documentElement.scrollWidth >
-        document.documentElement.clientWidth,
-    );
-    expect(hasHorizontalOverflow).toBe(false);
-  });
+  }
 }
+
+test("supports keyboard navigation to content and setup", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  await page.keyboard.press("Tab");
+  const skipLink = page.getByRole("link", { name: "Skip to content" });
+  await expect(skipLink).toBeFocused();
+  await expect(skipLink).toBeInViewport();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("main")).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("link", { name: "Get started" })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/#setup$/);
+  await expect(
+    page.getByRole("heading", { name: "Setup", exact: true }),
+  ).toBeInViewport();
+  await expect(page.locator("html")).toHaveCSS("scroll-behavior", "auto");
+  await expect(page.locator(".primary-action")).toHaveCSS(
+    "transition-duration",
+    "1e-05s",
+  );
+});
 
 test("switches themes and preserves the choice", async ({ page }) => {
   await page.goto("/");

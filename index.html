@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="/src/site.css">
   </head>
   <body class="landing-page">
+    <a class="skip-link" href="#main-content">Skip to content</a>
     <header class="landing-nav">
       <a class="brand" href="%BASE_URL%" aria-label="Pi Share Viewer home">
         <span class="brand-mark" aria-hidden="true"></span>
@@ -51,11 +52,11 @@
       </div>
     </header>
 
-    <main class="landing-main">
+    <main id="main-content" class="landing-main" tabindex="-1">
       <section class="hero" aria-labelledby="hero-title">
         <div class="hero-copy">
           <p class="eyebrow"><span aria-hidden="true"></span>Open source · Self-hosted</p>
-          <h1 id="hero-title">Share Pi sessions.</h1>
+          <h1 id="hero-title">Share Pi <span>sessions.</span></h1>
           <p class="hero-lead">A self-hosted viewer for <code>/share</code>.</p>
           <p class="hero-detail">
             Turn a complete coding session into a clean, readable link—Mermaid
@@ -93,6 +94,27 @@
               </div>
             </div>
           </div>
+          <div class="preview-session" aria-hidden="true">
+            <div class="preview-session-heading">
+              <span class="preview-session-label">SESSION PREVIEW</span>
+              <span class="preview-session-file">session.html</span>
+            </div>
+            <div class="preview-message">
+              <span class="message-avatar user-avatar">You</span>
+              <div>
+                <span class="message-role">User</span>
+                <p>Make this easier to understand.</p>
+              </div>
+            </div>
+            <div class="preview-message">
+              <span class="message-avatar assistant-avatar">π</span>
+              <div>
+                <span class="message-role">Assistant</span>
+                <p>Here's the full picture. Every prompt, tool call, and diagram—in context.</p>
+                <div class="preview-tool"><span>✓</span> Read <span>src/session.ts</span></div>
+              </div>
+            </div>
+          </div>
           <div class="preview-meta" aria-hidden="true">
             <span>Prompts</span>
             <span>Tool output</span>
@@ -101,10 +123,31 @@
         </div>
       </section>
 
+      <section class="features" aria-label="Viewer features">
+        <article class="feature">
+          <span class="feature-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5zM9 8h6M9 12h6M9 16h3"/></svg>
+          </span>
+          <div><h2>The whole conversation</h2><p>Prompts, code, and tool output. Nothing out of context.</p></div>
+        </article>
+        <article class="feature">
+          <span class="feature-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="6" height="6" rx="1.5"/><rect x="15" y="15" width="6" height="6" rx="1.5"/><path d="M9 6h6a3 3 0 0 1 3 3v6M6 9v9h9"/></svg>
+          </span>
+          <div><h2>Diagrams, brought to life</h2><p>Explore Mermaid diagrams with pan, zoom, and fullscreen.</p></div>
+        </article>
+        <article class="feature">
+          <span class="feature-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M3 8h18M8 21h8M12 17v4"/></svg>
+          </span>
+          <div><h2>Your viewer. Your domain.</h2><p>Self-host a static site. No Pi extension required.</p></div>
+        </article>
+      </section>
+
       <section id="setup" class="setup-section" aria-labelledby="setup-title">
         <div class="section-heading">
           <div>
-            <p class="section-kicker">Quick setup</p>
+            <p class="section-kicker">From terminal to shareable link</p>
             <h2 id="setup-title">Setup</h2>
             <p class="section-title-detail">Two steps. One shareable session.</p>
           </div>
@@ -132,6 +175,7 @@
               </button>
             </div>
             <p class="setup-description">Point Pi at this viewer before launch.</p>
+            <div class="code-caption">Terminal</div>
             <pre><code id="setup-command">export PI_SHARE_VIEWER_URL="https://your-viewer.example/session/"
 pi</code></pre>
           </article>
@@ -155,6 +199,7 @@ pi</code></pre>
               </button>
             </div>
             <p class="setup-description">Run Pi's built-in sharing command.</p>
+            <div class="code-caption">Inside Pi</div>
             <pre><code id="share-command">/share</code></pre>
           </article>
         </div>
@@ -173,7 +218,7 @@ pi</code></pre>
     </main>
 
     <footer class="landing-footer">
-      <span>Pi Share Viewer</span>
+      <span class="footer-brand"><span aria-hidden="true">π</span> Pi Share Viewer</span>
       <span>Sessions stay between your browser and GitHub.</span>
     </footer>
 
