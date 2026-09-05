@@ -1,7 +1,9 @@
 /** @vitest-environment jsdom */
 
+import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 import { injectMermaidEnhancer } from "../src/inject.js";
+import { prepareMathHook } from "../src/math-inject.js";
 import { isDarkColor } from "../src/theme.js";
 import { renderError } from "../src/ui.js";
 
@@ -27,6 +29,7 @@ describe("session enhancement injection", () => {
       output.indexOf("session-data"),
     );
     expect(output).toContain("connect-src 'none'");
+    expect(output).toContain("font-src data:");
     expect(output).toContain("frame-src blob:");
     expect(output).toContain("__PI_MERMAID_RENDERER_SOURCE__");
     expect(output).toContain("__PI_SHARE_VIEWER_THEME__");
@@ -111,6 +114,78 @@ describe("session enhancement injection", () => {
         "unsafe-diagram-1",
       ),
     ).toThrow("Invalid diagram ID");
+  });
+});
+
+describe("version-scoped math hook", () => {
+  const template = readFileSync(
+    "node_modules/@earendil-works/pi-coding-agent/dist/core/export-html/template.js",
+    "utf8",
+  );
+  const fixture = () =>
+    new DOMParser().parseFromString(
+      `<html><head></head><body><script id="session-data" type="application/json">e30=</script><script>/* marked v18.0.5 */</script><script>/* hljs */</script><script>${template}</script></body></html>`,
+      "text/html",
+    );
+
+  test("patches only four exact message call sites and runs after libraries but before the application", () => {
+    const root = fixture();
+    const application = prepareMathHook(root);
+    expect(application).toBeDefined();
+    expect(
+      application?.textContent?.match(/globalThis\.__PI_MATH_PARSE__/g),
+    ).toHaveLength(4);
+    expect(application?.textContent).toContain(
+      `\${safeMarkedParse(entry.summary)}`,
+    );
+    expect(root.getElementById("session-data")?.textContent).toBe("e30=");
+    const output = injectMermaidEnhancer(
+      fixture().documentElement.outerHTML,
+      "globalThis.mathTestRuntime = true;",
+      "renderer",
+      GIST_ID,
+      "https://example.com",
+    );
+    expect(output.indexOf("/* hljs */")).toBeLessThan(
+      output.indexOf("globalThis.mathTestRuntime"),
+    );
+    expect(output.indexOf("globalThis.mathTestRuntime")).toBeLessThan(
+      output.indexOf("function safeMarkedParse("),
+    );
+    expect(output).toContain("globalThis.__PI_MATH_PARSE__ || safeMarkedParse");
+  });
+
+  test.each([
+    "missing",
+    "duplicate-call",
+    "duplicate-application",
+    "changed-parser",
+    "changed-library",
+    "external-application",
+  ])("leaves an incompatible export completely unpatched: %s", (change) => {
+    const root = fixture();
+    const application = root.body.lastElementChild as HTMLScriptElement;
+    if (change === "missing")
+      application.textContent = template.replace(
+        `\${safeMarkedParse(text)}`,
+        `\${otherParser(text)}`,
+      );
+    if (change === "duplicate-call")
+      application.textContent += `\${safeMarkedParse(text)}`;
+    if (change === "duplicate-application")
+      root.body.append(application.cloneNode(true));
+    if (change === "changed-parser")
+      application.textContent = template.replace(
+        "return marked.parse(text);",
+        "return marked.parse(text, options);",
+      );
+    if (change === "changed-library")
+      root.querySelectorAll("script")[1].textContent = "marked v99";
+    if (change === "external-application")
+      application.src = "https://example.com/app.js";
+    const before = root.documentElement.outerHTML;
+    expect(prepareMathHook(root)).toBeUndefined();
+    expect(root.documentElement.outerHTML).toBe(before);
   });
 });
 

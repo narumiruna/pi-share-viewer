@@ -44,7 +44,7 @@ export function replaceSessionText(
   if (!firstMessage || typeof content !== "string") {
     throw new Error("Fixture message is missing");
   }
-  firstMessage.content = content.replace(original, replacement);
+  firstMessage.content = content.replace(original, () => replacement);
 
   const encoded = Buffer.from(JSON.stringify(payload)).toString("base64");
   return html.replace(match[0], `${match[1]}${encoded}${match[3]}`);

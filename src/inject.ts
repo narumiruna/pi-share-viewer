@@ -1,4 +1,5 @@
 import { MAX_SESSION_HTML_BYTES } from "./gist.js";
+import { prepareMathHook } from "./math-inject.js";
 import type { SiteTheme } from "./theme.js";
 
 const MAX_RUNTIME_BYTES = 8 * 1024 * 1024;
@@ -98,6 +99,8 @@ export function injectMermaidEnhancer(
   );
 
   document.head.prepend(policy, shareUrl, deepLinkParams, diagramTarget);
-  document.body.append(runtime);
+  const mathApplication = prepareMathHook(document);
+  if (mathApplication) mathApplication.before(runtime);
+  else document.body.append(runtime);
   return `<!doctype html>\n${document.documentElement.outerHTML}`;
 }

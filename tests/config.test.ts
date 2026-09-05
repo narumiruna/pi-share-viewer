@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
+import enhancerConfig from "../vite.enhancer.config.js";
 
 describe("repository shape", () => {
   test("is a private, flat Web app without a Pi extension", () => {
@@ -28,6 +29,7 @@ describe("repository shape", () => {
       "@radix-ui/react-toolbar": expect.any(String),
       "@radix-ui/react-tooltip": expect.any(String),
       marked: expect.any(String),
+      katex: expect.any(String),
       react: expect.any(String),
       "react-dom": expect.any(String),
     });
@@ -41,6 +43,24 @@ describe("repository shape", () => {
     expect(enhancerConfig).toContain('JSON.stringify("production")');
     expect(rendererConfig).toContain("src/mermaid-renderer.ts");
     expect(rendererConfig).toContain('fileName: () => "mermaid-renderer.js"');
+  });
+
+  test("embeds scoped KaTeX styles, licensed WOFF2 fonts and no external URLs", () => {
+    const css = JSON.parse(
+      enhancerConfig.define?.__PI_KATEX_CSS__ as string,
+    ) as string;
+    expect(css).toContain("Permission is hereby granted");
+    expect(css).toContain(".pi-math .katex{");
+    expect(css).toContain(".pi-math{counter-reset:");
+    const fonts = [...css.matchAll(/url\(([^)]+)\)/g)];
+    expect(fonts.length).toBeGreaterThan(0);
+    for (const [, url] of fonts) {
+      expect(url).toMatch(/^data:font\/woff2;base64,/);
+      expect(
+        Buffer.from(url.split(",")[1], "base64").subarray(0, 4).toString(),
+      ).toBe("wOF2");
+    }
+    expect(css).not.toMatch(/url\((?!data:)/);
   });
 
   test("keeps container execution out of CI", () => {
@@ -82,6 +102,8 @@ describe("repository shape", () => {
     expect(nginx).toContain("location = /healthz");
     expect(sessionPage).toContain('sandbox="allow-scripts allow-downloads"');
     expect(sessionPage).toContain("img-src data: blob:");
+    expect(sessionPage).toContain("font-src data:");
+    expect(nginx).toContain("font-src data:");
     expect(nginx).toContain("img-src 'self' data: blob:");
     expect(sessionPage).not.toContain("allow-same-origin");
   });

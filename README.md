@@ -2,6 +2,8 @@
 
 `pi-share-viewer` is a self-hosted viewer for Pi session Gists. It preserves Pi's exported tree navigation, message deep links, and JSONL downloads, applies a responsive Radix-based reading interface, and converts Mermaid fences into accessible interactive diagrams with natural sizing, pan, zoom, focused tracing, fullscreen, source, export, and deep-link controls.
 
+User and assistant messages also support browser-local KaTeX math, with bundled styles and fonts.
+
 No Pi extension is required. Pi's built-in `/share` already creates `session.html`; `PI_SHARE_VIEWER_URL` changes the URL returned for its GitHub Gist fallback.
 
 > GitHub secret Gists are unlisted, not private. Anyone with the URL can read the complete session.
@@ -43,7 +45,33 @@ The desktop toolbar groups controls from left to right: zoom/fit/reset, presenta
 
 ### Radix session interface
 
-The enhancer keeps Pi's original DOM and interaction scripts, then adds a scoped responsive chrome layer using Radix Colors. Mermaid controls run as an isolated React island built with Radix Toolbar, Toggle, Tooltip, and Icons primitives. The restyled sidebar, session metadata, messages, tools, Markdown, tables, and code blocks do not require a second session renderer or any external assets.
+The enhancer preserves Pi's DOM structure and interactions, then adds a scoped responsive chrome layer using Radix Colors. Mermaid controls run as an isolated React island built with Radix Toolbar, Toggle, Tooltip, and Icons primitives. The restyled sidebar, session metadata, messages, tools, Markdown, tables, and code blocks do not require a second session renderer or any external assets.
+
+### LaTeX math
+
+The verified Pi `0.85.0` export supports these delimiters in user and assistant Markdown:
+
+```text
+Inline: $x_i$ or \(x_{i_j}\)
+Display: $$\frac{a}{b}$$ or \[\sum_{i=1}^{n} i\]
+
+$$
+\begin{aligned}
+a &= b \\
+c &= d
+\end{aligned}
+$$
+```
+
+Formulas work in paragraphs, lists, block quotes, and table cells. Use `\lvert` / `\rvert` or Markdown-escaped pipes in tables so the table parser does not split a formula into cells. Long inline and display formulas scroll horizontally on narrow screens. Inline delimiters cannot span lines. This is KaTeX's supported TeX subset, not a complete LaTeX document engine; arbitrary packages, TikZ, automatic numbering, and cross-references are not provided.
+
+A single-dollar formula cannot begin or end with whitespace, and its closing dollar cannot be followed by a digit. `$5 and $10` stays ordinary text, but `$5$` is a formula. Write `\$5` for a literal price, or use inline code to show formula syntax. Inline code, fenced code (including `latex` / `tex` fences), raw HTML, link destinations, tool output, thinking, summaries, custom messages, and Mermaid labels are not math-enhanced.
+
+The viewer protects formulas before Pi's Markdown parser consumes their punctuation. A compatibility-checked hook changes only four user/assistant parsing call sites and runs the enhancer after Pi's vendored libraries but before its application script. It retains Pi's URL sanitization, code highlighting, original `#session-data`, message links, tree navigation, and JSONL download. If the expected template structure or parser extensions differ, math enhancement falls back to the original Pi Markdown presentation without partially patching the template; Pi may consume backslash delimiters in that fallback.
+
+KaTeX, scoped CSS, WOFF2 fonts, and the KaTeX license are bundled into the enhancer; no CDN or formula-rendering service is used. Parent and child CSP allow only `data:` fonts. Rendering uses `trust: false`, strict errors, isolated macros, `maxExpand: 1000`, and `maxSize: 20`. Commands requiring trust cannot create links, load images, or inject HTML; KaTeX may display their command names in red.
+
+Invalid or oversized formulas keep their delimited source. Limits per session document are 10,000 UTF-8 bytes per formula, 500 attempted renders, and 500,000 cumulative source bytes (including delimiters). Oversized formulas do not consume the render budget. At most ten formulas are processed per batch before yielding; repeated scans of the same DOM do not consume the budget again, while newly created formula nodes do. A page reload resets the budget. These bounds are not a forcibly interruptible timeout for synchronous KaTeX rendering or Pi's existing Markdown parsing.
 
 ## Configure Pi
 
@@ -242,7 +270,7 @@ Browser support:
 ## Project layout
 
 ```text
-src/                       Gist loader, Radix session UI, Mermaid runtime, view controls, render queue, decorator, and export helpers
+src/                       Gist loader, Radix session UI, math hook/parser/renderer, Mermaid runtime, view controls, render queue, decorator, and export helpers
 session/                   Session viewer HTML entry
 index.html                 Landing page
 Dockerfile                 Multi-stage production image
