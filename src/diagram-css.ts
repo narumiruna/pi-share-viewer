@@ -92,10 +92,11 @@ const DIAGRAM_CSS = `
   .pi-mermaid-viewport { min-height: 10rem; padding: .5rem; }
   .pi-mermaid-toolbar { align-items: flex-start; }
   .pi-mermaid-controls { justify-content: flex-end; width: 100%; }
+  .pi-mermaid-control-group { flex-wrap: wrap; max-width: 100%; }
   .pi-mermaid-toolbar button { width: 2.75rem; min-width: 2.75rem; height: 2.75rem; min-height: 2.75rem; }
   .pi-mermaid-group-label { display: none; }
   .pi-mermaid-more { display: inline-grid !important; }
-  .pi-mermaid-secondary { display: none; position: absolute; z-index: 5; top: calc(100% + .35rem); right: 0; width: max-content; max-width: 100%; box-sizing: border-box; flex-wrap: wrap; gap: .35rem; border: 1px solid var(--pi-diagram-border); border-radius: .35rem; background: var(--pi-diagram-panel-soft); padding: .35rem; box-shadow: 0 8px 24px rgb(0 0 0 / 18%); }
+  .pi-mermaid-secondary { display: none; order: 1; flex-basis: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; flex-wrap: wrap; gap: .35rem; margin-top: .35rem; border: 1px solid var(--pi-diagram-border); border-radius: .35rem; background: var(--pi-diagram-panel-soft); padding: .35rem; }
   .pi-mermaid-secondary.is-open { display: flex; }
 }
 `;

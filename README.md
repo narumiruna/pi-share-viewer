@@ -39,7 +39,7 @@ Inline diagrams keep their natural rendered size and only shrink when necessary.
 - Original/Polished presentation, optional reduced-motion-aware edge tracing, source display, and fullscreen. Flowchart nodes can be focused to isolate directly related paths; other diagram kinds retain generic tracing when reliable endpoint metadata is unavailable.
 - Copy source, Copy SVG, Download SVG, Download PNG, and Copy diagram link. All exports are generated locally from the accepted SVG and make no rendering-service request.
 
-The desktop toolbar groups controls from left to right: zoom/fit/reset, presentation/tracing, source, sharing/export, then fullscreen. On narrow screens, zoom, fit, fullscreen, and **More diagram actions** remain visible; More contains reset, presentation/tracing, source, and sharing/export in that order. Malformed or oversized diagrams retain their source and show a concise error with expandable technical details.
+The desktop toolbar groups controls from left to right: zoom/fit/reset, presentation/tracing, source, sharing/export, then fullscreen. On narrow screens, zoom, fit, fullscreen, and **More diagram actions** remain visible; More contains reset, presentation/tracing, source, and sharing/export in that order. Opening More focuses its first action; arrow keys navigate the toolbar, and Escape closes More and returns focus to its button. The expanded actions remain in the card's layout and wrap within nested Markdown containers instead of covering or clipping the diagram. Malformed or oversized diagrams retain their source and show a concise error with expandable technical details.
 
 ### Radix session interface
 

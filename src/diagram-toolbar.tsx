@@ -19,7 +19,13 @@ import {
 import * as Toggle from "@radix-ui/react-toggle";
 import * as Toolbar from "@radix-ui/react-toolbar";
 import * as Tooltip from "@radix-ui/react-tooltip";
-import { type ComponentType, createElement, useEffect, useState } from "react";
+import {
+  type ComponentType,
+  createElement,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { createRoot } from "react-dom/client";
 import type { DiagramDisplayMode } from "./diagram-style.js";
 
@@ -108,6 +114,16 @@ function DiagramToolbar({
   const [moreOpen, setMoreOpen] = useState(false);
   const [zoom, setZoom] = useState(100);
   const [status, setStatus] = useState("");
+  const secondaryRef = useRef<HTMLDivElement>(null);
+  const moreRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (moreOpen) {
+      secondaryRef.current
+        ?.querySelector<HTMLButtonElement>("button:not(:disabled)")
+        ?.focus();
+    }
+  }, [moreOpen]);
 
   useEffect(() => {
     register({ announce: setStatus, setZoom });
@@ -163,6 +179,18 @@ function DiagramToolbar({
       <Toolbar.Root
         aria-label="Diagram controls"
         className="pi-mermaid-controls"
+        onKeyDown={(event) => {
+          if (
+            event.key === "Escape" &&
+            moreOpen &&
+            moreRef.current?.getClientRects().length
+          ) {
+            event.preventDefault();
+            event.stopPropagation();
+            setMoreOpen(false);
+            moreRef.current.focus();
+          }
+        }}
       >
         <fieldset
           aria-label="Diagram view"
@@ -192,6 +220,7 @@ function DiagramToolbar({
         </fieldset>
 
         <div
+          ref={secondaryRef}
           id={`${fullscreenTarget.id}-actions`}
           className={`pi-mermaid-secondary${moreOpen ? " is-open" : ""}`}
         >
@@ -216,19 +245,21 @@ function DiagramToolbar({
             {polishSupported ? (
               <Tooltip.Root>
                 <Tooltip.Trigger asChild>
-                  <Toggle.Root
-                    aria-label={
-                      polished ? "Use original style" : "Use polished style"
-                    }
-                    className="pi-mermaid-control"
-                    onPressedChange={async (pressed) => {
-                      const active = await onAction("display-mode", pressed);
-                      if (typeof active === "boolean") setPolished(active);
-                    }}
-                    pressed={polished}
-                  >
-                    <MixerHorizontalIcon />
-                  </Toggle.Root>
+                  <Toolbar.Button asChild>
+                    <Toggle.Root
+                      aria-label={
+                        polished ? "Use original style" : "Use polished style"
+                      }
+                      className="pi-mermaid-control"
+                      onPressedChange={async (pressed) => {
+                        const active = await onAction("display-mode", pressed);
+                        if (typeof active === "boolean") setPolished(active);
+                      }}
+                      pressed={polished}
+                    >
+                      <MixerHorizontalIcon />
+                    </Toggle.Root>
+                  </Toolbar.Button>
                 </Tooltip.Trigger>
                 <Tooltip.Portal>
                   <Tooltip.Content
@@ -243,18 +274,20 @@ function DiagramToolbar({
             ) : null}
             <Tooltip.Root>
               <Tooltip.Trigger asChild>
-                <Toggle.Root
-                  aria-label="Trace edges"
-                  className="pi-mermaid-control"
-                  disabled={!polishSupported}
-                  onPressedChange={(pressed) => {
-                    setTracing(pressed);
-                    void onAction("trace", pressed);
-                  }}
-                  pressed={tracing}
-                >
-                  <ActivityLogIcon />
-                </Toggle.Root>
+                <Toolbar.Button asChild disabled={!polishSupported}>
+                  <Toggle.Root
+                    aria-label="Trace edges"
+                    className="pi-mermaid-control"
+                    disabled={!polishSupported}
+                    onPressedChange={(pressed) => {
+                      setTracing(pressed);
+                      void onAction("trace", pressed);
+                    }}
+                    pressed={tracing}
+                  >
+                    <ActivityLogIcon />
+                  </Toggle.Root>
+                </Toolbar.Button>
               </Tooltip.Trigger>
               <Tooltip.Portal>
                 <Tooltip.Content
@@ -346,6 +379,7 @@ function DiagramToolbar({
           onAction={() => toggleFullscreen()}
         />
         <Toolbar.Button
+          ref={moreRef}
           aria-controls={`${fullscreenTarget.id}-actions`}
           aria-expanded={moreOpen}
           aria-label="More diagram actions"
