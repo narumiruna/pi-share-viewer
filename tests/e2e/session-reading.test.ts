@@ -143,7 +143,11 @@ test("Reading and Inspect controls reflect content and survive branch renders", 
 
   const systemPrompt = frame.locator("details.system-prompt");
   await systemPrompt.locator("summary").click();
+  await expect(systemPrompt.locator(".system-prompt-full")).toBeVisible();
   await expect(systemPrompt).toContainText("Sanitized system instruction 28");
+  await expect(
+    systemPrompt.locator(".system-prompt-preview, .system-prompt-expand-hint"),
+  ).toHaveCount(0);
   const availableTools = frame.locator("details.tools-list");
   await availableTools.locator("summary").click();
   await expect(availableTools).toContainText("Sanitized read tool definition");

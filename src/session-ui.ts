@@ -58,6 +58,7 @@ function createDisclosure(
   container.removeAttribute("onclick");
   const details = document.createElement("details");
   for (const className of container.classList) details.classList.add(className);
+  details.classList.remove("expandable", "expanded");
   details.classList.add("pi-session-disclosure");
   details.dataset.piDisclosure = "true";
   details.open = defaultOpen;
@@ -66,11 +67,20 @@ function createDisclosure(
   const body = document.createElement("div");
   body.className = "pi-session-disclosure-body";
   for (const child of [...container.childNodes]) {
-    if (
-      child instanceof Element &&
-      child.matches(".system-prompt-header, .tools-header")
-    ) {
-      continue;
+    if (child instanceof Element) {
+      if (child.matches(".system-prompt-header, .tools-header")) continue;
+      if (
+        container.classList.contains("system-prompt") &&
+        child.matches(".system-prompt-preview, .system-prompt-expand-hint")
+      ) {
+        continue;
+      }
+      if (
+        child instanceof HTMLElement &&
+        child.matches(".system-prompt-full")
+      ) {
+        child.style.display = "block";
+      }
     }
     body.append(child);
   }
