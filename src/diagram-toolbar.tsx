@@ -166,10 +166,17 @@ function DiagramToolbar({
     if (!moreOpen) return;
     const outside = (event: PointerEvent) => {
       if (toolbarRef.current?.contains(event.target as Node)) return;
+      const interactive =
+        event.target instanceof Element &&
+        event.target.closest(
+          'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        );
       setMoreOpen(false);
-      requestAnimationFrame(() =>
-        moreRef.current?.focus({ preventScroll: true }),
-      );
+      if (!interactive) {
+        requestAnimationFrame(() =>
+          moreRef.current?.focus({ preventScroll: true }),
+        );
+      }
     };
     document.addEventListener("pointerdown", outside, true);
     return () => document.removeEventListener("pointerdown", outside, true);
@@ -257,11 +264,18 @@ function DiagramToolbar({
         aria-label="Diagram controls"
         className="pi-mermaid-controls"
         onKeyDown={(event) => {
-          if (event.key === "Escape" && moreOpen) {
+          if (event.key !== "Escape") return;
+          if (moreOpen) {
             event.preventDefault();
-            event.stopPropagation();
+            event.nativeEvent.stopImmediatePropagation();
             setMoreOpen(false);
             moreRef.current?.focus();
+          } else if (
+            fullscreenTarget.classList.contains("pi-mermaid-expanded")
+          ) {
+            event.preventDefault();
+            event.nativeEvent.stopImmediatePropagation();
+            void toggleFullscreen();
           }
         }}
       >

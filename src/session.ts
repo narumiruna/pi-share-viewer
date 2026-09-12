@@ -10,13 +10,16 @@ import {
 import { renderError } from "./ui.js";
 
 const LOAD_TIMEOUT_MS = 30_000;
+const BOOTSTRAP_READY_TIMEOUT_MS = 5_000;
 const RUNTIME_TIMEOUT_MS = 10_000;
 const MAX_RUNTIME_SOURCE_BYTES = 8 * 1024 * 1024;
 type RuntimeKind = "enhancer" | "renderer";
 type RuntimeAsset = "bootstrap" | RuntimeKind;
 
 interface ViewerLoad {
+  activationTimers: Map<RuntimeKind, number>;
   active: Set<RuntimeKind>;
+  bootstrapTimer?: number;
   controllers: Map<RuntimeKind, AbortController>;
   errors: Map<RuntimeKind, Error>;
   frame: HTMLIFrameElement;
@@ -67,13 +70,40 @@ function isCurrent(load: ViewerLoad): boolean {
   return activeLoad === load && load.sequence === loadSequence;
 }
 
+function clearActivationTimer(load: ViewerLoad, kind: RuntimeKind): void {
+  const timer = load.activationTimers.get(kind);
+  if (timer === undefined) return;
+  window.clearTimeout(timer);
+  load.activationTimers.delete(kind);
+}
+
 function postRuntime(load: ViewerLoad, kind: RuntimeKind): void {
   const source = load.sources.get(kind);
-  if (!load.ready || !source || !isCurrent(load)) return;
+  if (
+    !load.ready ||
+    !source ||
+    !isCurrent(load) ||
+    load.activationTimers.has(kind)
+  ) {
+    return;
+  }
   load.frame.contentWindow?.postMessage(
     { type: "pi-share-viewer-runtime", loadId: load.id, kind, source },
     "*",
   );
+  const timer = window.setTimeout(() => {
+    if (!isCurrent(load) || load.active.has(kind)) return;
+    load.activationTimers.delete(kind);
+    load.sources.delete(kind);
+    load.errors.set(
+      kind,
+      new Error(
+        `${kind === "enhancer" ? "Enhancer" : "Renderer"} failed to initialize.`,
+      ),
+    );
+    updateEnhancementStatus(load);
+  }, RUNTIME_TIMEOUT_MS);
+  load.activationTimers.set(kind, timer);
 }
 
 function updateEnhancementStatus(load: ViewerLoad): void {
@@ -150,12 +180,18 @@ async function fetchRuntime(
 function retryEnhancements(): void {
   const load = activeLoad;
   if (!load || !isCurrent(load)) return;
+  if (!load.ready) {
+    void loadViewer();
+    return;
+  }
   for (const kind of load.errors.keys()) void fetchRuntime(load, kind);
 }
 
 function retryableSessionError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
-  return /reach GitHub|rate limit|request failed|timed out/i.test(message);
+  return /reach GitHub|rate limit|request failed|timed out|failed to fetch|session bootstrap runtime \(5\d\d\)/i.test(
+    message,
+  );
 }
 
 export async function loadViewer(): Promise<void> {
@@ -163,6 +199,10 @@ export async function loadViewer(): Promise<void> {
   if (activeLoad) {
     for (const controller of activeLoad.controllers.values())
       controller.abort();
+    for (const timer of activeLoad.activationTimers.values())
+      window.clearTimeout(timer);
+    if (activeLoad.bootstrapTimer !== undefined)
+      window.clearTimeout(activeLoad.bootstrapTimer);
   }
   activeLoad = undefined;
   const controller = new AbortController();
@@ -198,6 +238,7 @@ export async function loadViewer(): Promise<void> {
 
     const id = `${sequence}-${crypto.randomUUID()}`;
     const load: ViewerLoad = {
+      activationTimers: new Map(),
       active: new Set(),
       controllers: new Map(),
       errors: new Map(),
@@ -219,6 +260,15 @@ export async function loadViewer(): Promise<void> {
       urlParams,
       diagramId,
     );
+    load.bootstrapTimer = window.setTimeout(() => {
+      if (!isCurrent(load) || load.ready) return;
+      load.bootstrapTimer = undefined;
+      load.errors.set(
+        "enhancer",
+        new Error("Session bootstrap failed to initialize."),
+      );
+      updateEnhancementStatus(load);
+    }, BOOTSTRAP_READY_TIMEOUT_MS);
     loading.hidden = true;
     frame.hidden = false;
     updateEnhancementStatus(load);
@@ -260,6 +310,10 @@ window.addEventListener("message", (event: MessageEvent) => {
     Object.keys(data).every((key) => ["type", "loadId"].includes(key))
   ) {
     load.ready = true;
+    if (load.bootstrapTimer !== undefined) {
+      window.clearTimeout(load.bootstrapTimer);
+      load.bootstrapTimer = undefined;
+    }
     postRuntime(load, "renderer");
     postRuntime(load, "enhancer");
     return;
@@ -270,6 +324,7 @@ window.addEventListener("message", (event: MessageEvent) => {
     (data.kind === "enhancer" || data.kind === "renderer") &&
     Object.keys(data).every((key) => ["type", "loadId", "kind"].includes(key))
   ) {
+    clearActivationTimer(load, data.kind);
     load.active.add(data.kind);
     updateEnhancementStatus(load);
     return;
@@ -277,12 +332,18 @@ window.addEventListener("message", (event: MessageEvent) => {
   if (
     data?.type === "pi-share-viewer-runtime-failed" &&
     data.loadId === load.id &&
-    data.kind === "enhancer" &&
+    (data.kind === "enhancer" || data.kind === "renderer") &&
     Object.keys(data).every((key) => ["type", "loadId", "kind"].includes(key))
   ) {
-    load.active.delete("enhancer");
-    load.sources.delete("enhancer");
-    load.errors.set("enhancer", new Error("Enhancer failed to initialize."));
+    clearActivationTimer(load, data.kind);
+    load.active.delete(data.kind);
+    load.sources.delete(data.kind);
+    load.errors.set(
+      data.kind,
+      new Error(
+        `${data.kind === "enhancer" ? "Enhancer" : "Renderer"} failed to initialize.`,
+      ),
+    );
     updateEnhancementStatus(load);
   }
 });

@@ -70,7 +70,8 @@ test("promotes a newly visible queued theme refresh", async ({ page }) => {
   await page.route("**/assets/mermaid-renderer.js", (route) =>
     route.fulfill({
       contentType: "application/javascript",
-      body: `window.addEventListener("message", ({ data: request }) => {
+      body: `window.parent.postMessage({ type: "pi-mermaid-render-ready" }, "*");
+    window.addEventListener("message", ({ data: request }) => {
       setTimeout(() => parent.postMessage({ type: "pi-mermaid-render-result", requestId: request.requestId,
         diagramType: "flowchart-v2", svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100"><text>Diagram</text></svg>'
       }, "*"), request.dark ? 0 : 1500);

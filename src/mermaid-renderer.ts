@@ -1,6 +1,7 @@
 import mermaid from "mermaid";
 import { MAX_RENDERED_SVG_BYTES, MAX_SOURCE_BYTES } from "./mermaid-limits.js";
 import {
+  MERMAID_RENDER_READY,
   MERMAID_RENDER_REQUEST,
   MERMAID_RENDER_RESULT,
   type MermaidRenderRequest,
@@ -77,3 +78,5 @@ window.addEventListener("message", async (event) => {
     });
   }
 });
+
+window.parent.postMessage({ type: MERMAID_RENDER_READY }, "*");

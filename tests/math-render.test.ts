@@ -184,6 +184,14 @@ describe("math lifecycle", () => {
       expect(
         content.querySelectorAll('[data-pi-math-state="limited"]'),
       ).toHaveLength(989);
+      expect(content.querySelectorAll(".pi-math-shell")).toHaveLength(
+        MATH_BATCH_SIZE,
+      );
+      expect(
+        content.querySelectorAll(
+          '[data-pi-math-state="limited"] .pi-math-controls',
+        ),
+      ).toHaveLength(0);
       expect(nodes[10].textContent).toBe("$x$");
       // Reattached and newly-created nodes must never restart an exhausted queue.
       const fresh = formula("$y$");

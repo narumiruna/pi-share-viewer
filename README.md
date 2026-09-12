@@ -43,7 +43,7 @@ HTML entries are in `src/index.html` and `src/session/index.html`; static assets
 
 - **Reading** is the default view. It keeps metadata compact and hides thinking and tool execution details. **Inspect**, **Show thinking**, and **Show tools** reveal those details without changing the shared session.
 - Sidebar search and **Hide tool entries** affect navigation only. The reading marker follows the visible message independently of the selected branch.
-- Diagrams open in **Readable** mode at legible label sizes. Use **Show overview** to fit the whole diagram. Cropped diagrams remain reachable; open fullscreen for one-finger pan and two-finger pan/zoom. Inline touch gestures continue to scroll the page. Additional source, copy, style, trace, reset, and export controls are under **More diagram actions**.
+- Diagrams open fitted to the full **Overview**. Use **Use readable view** for legible label sizes; cropped diagrams remain reachable with arrow keys or fullscreen. Fullscreen supports one-finger pan and two-finger pan/zoom, while inline touch gestures continue to scroll the page. Additional source, copy, style, trace, reset, and export controls are under **More diagram actions**.
 - Formula source is available from the **Formula source** control. **Copy LaTeX** copies the original delimited expression. Wide display formulas show local scroll guidance and can be focused for keyboard scrolling.
 - The readable base session appears before optional Mermaid and KaTeX assets finish loading. If an optional asset fails, the source remains readable and **Retry enhancements** retries it without replacing the session frame or resetting the current view.
 

@@ -203,6 +203,10 @@ test("Reading and Inspect controls reflect content and survive branch renders", 
     "overflow-y",
     "auto",
   );
+  await frame.locator('.tree-node[data-id="aaaabbbb"] .pi-tree-action').click();
+  await expect(systemPrompt).toHaveAttribute("open", "");
+  await expect(availableTools).toHaveAttribute("open", "");
+  await frame.locator('.tree-node[data-id="88888888"] .pi-tree-action').click();
 
   await frame.getByRole("button", { name: "Inspect", exact: true }).click();
   await expect(root).toHaveAttribute("data-pi-session-mode", "inspect");
@@ -222,6 +226,12 @@ test("Reading and Inspect controls reflect content and survive branch renders", 
             .length,
       ),
   ).toBe(5);
+  await systemPrompt.locator("summary").click();
+  await expect(systemPrompt).not.toHaveAttribute("open", "");
+  await frame.locator('.tree-node[data-id="aaaabbbb"] .pi-tree-action').click();
+  await expect(systemPrompt).not.toHaveAttribute("open", "");
+  await expect(availableTools).toHaveAttribute("open", "");
+  await frame.locator('.tree-node[data-id="88888888"] .pi-tree-action').click();
 
   const firstTool = frame.locator(".tool-execution").first();
   await firstTool

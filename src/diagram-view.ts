@@ -341,6 +341,7 @@ export function createDiagramView(
   function onPointerDown(event: PointerEvent): void {
     if (event.pointerType === "touch") {
       if (!expanded()) return;
+      if (pointers.size === 0) suppressNodeClick = false;
       pointers.set(event.pointerId, {
         clientX: event.clientX,
         clientY: event.clientY,
@@ -414,7 +415,8 @@ export function createDiagramView(
   function stopPointer(event: PointerEvent): void {
     if (event.pointerType === "touch") {
       pointers.delete(event.pointerId);
-      if (touchMoved) suppressNodeClick = true;
+      if (event.type === "pointercancel") suppressNodeClick = false;
+      else if (touchMoved) suppressNodeClick = true;
       if (pointers.size < 2) pinch = undefined;
       const remaining = [...pointers.values()][0];
       touchLast = remaining

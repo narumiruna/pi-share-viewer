@@ -88,6 +88,12 @@ for (const width of [320, 640, 1440]) {
     await expect(more).toBeFocused();
     await more.click();
     await expect(secondary).toBeVisible();
+    const reading = frame.getByRole("button", { name: "Reading", exact: true });
+    await reading.click();
+    await expect(reading).toBeFocused();
+    await expect(secondary).toBeHidden();
+    await expect(more).toHaveAttribute("aria-expanded", "false");
+    await more.click();
     await card.screenshot({
       path: `test-results/diagram-toolbar-more-${width}.png`,
     });
@@ -159,12 +165,28 @@ test("More actions remain reachable in fallback fullscreen", async ({
   });
   await card.getByRole("button", { name: "Open fullscreen to pan" }).click();
   await expect(card).toHaveClass(/pi-mermaid-expanded/);
-  await card.getByRole("button", { name: "More diagram actions" }).click();
+  const sidebar = frame.locator("#sidebar");
+  const more = card.getByRole("button", { name: "More diagram actions" });
+  await more.click();
   for (const name of secondaryControls) {
     await card
       .getByRole("button", { name, exact: true })
       .click({ trial: true });
   }
+  await more.press("Escape");
+  await page.setViewportSize({ width: 1000, height: 800 });
+  await card.getByRole("button", { name: "Zoom in" }).focus();
+  await card.getByRole("button", { name: "Zoom in" }).press("Escape");
+  await expect(card).not.toHaveClass(/pi-mermaid-expanded/);
+  await expect(sidebar).toHaveJSProperty("inert", false);
+
+  await card.getByRole("button", { name: "Open fullscreen to pan" }).click();
+  await expect(card).toHaveClass(/pi-mermaid-expanded/);
+  await page.setViewportSize({ width: 390, height: 800 });
+  await card.getByRole("button", { name: "Zoom out" }).focus();
+  await card.getByRole("button", { name: "Zoom out" }).press("Escape");
+  await expect(card).not.toHaveClass(/pi-mermaid-expanded/);
+  await expect(sidebar).toHaveJSProperty("inert", true);
   await page.screenshot({
     path: "test-results/diagram-toolbar-fullscreen.png",
   });

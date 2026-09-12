@@ -91,6 +91,11 @@ test("tree controls support keyboard activation and track reading separately", a
   await expect(frame.locator("#entry-88888888")).toBeFocused();
   await expect(main).toHaveAttribute("aria-selected", "true");
   await expect(main).toHaveAttribute("data-pi-branch-member", "true");
+  const diagram = frame.locator('[id="11111111-diagram-1"]');
+  await diagram.scrollIntoViewIfNeeded();
+  await expect(diagram).toHaveAttribute("data-pi-mermaid-state", "rendered", {
+    timeout: 30_000,
+  });
 
   await frame.locator("#entry-22222222").evaluate((target) => {
     target.scrollIntoView({ block: "center" });
@@ -134,6 +139,48 @@ test("a hidden tool deep link reveals only its target", async ({ page }) => {
   await expect(
     frame.locator('.tool-execution[data-pi-revealed="true"]'),
   ).toHaveCount(0);
+});
+
+test("reading marker follows same-breakpoint viewport reflow", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1200, height: 900 });
+  await mockGist(page, await createReviewExportFixture());
+  await page.goto(`/session/#${DARK_GIST_ID}`);
+  const frame = page.frameLocator("#preview");
+  await frame.locator("#messages").evaluate((messages) => {
+    for (const entry of messages.querySelectorAll<HTMLElement>(
+      '[id^="entry-"]',
+    )) {
+      const top =
+        entry.id === "entry-11111111"
+          ? 100
+          : entry.id === "entry-22222222"
+            ? 400
+            : 2_000;
+      entry.getBoundingClientRect = () =>
+        ({
+          bottom: top + 200,
+          height: 200,
+          left: 0,
+          right: 800,
+          top,
+          width: 800,
+          x: 0,
+          y: top,
+          toJSON: () => ({}),
+        }) as DOMRect;
+    }
+    window.dispatchEvent(new Event("resize"));
+  });
+  await expect(
+    frame.locator('.tree-node[data-id="22222222"] .pi-tree-action'),
+  ).toHaveAttribute("aria-current", "location");
+
+  await page.setViewportSize({ width: 1200, height: 300 });
+  await expect(
+    frame.locator('.tree-node[data-id="11111111"] .pi-tree-action'),
+  ).toHaveAttribute("aria-current", "location");
 });
 
 test("mobile page controls do not cover content while scrolling", async ({
@@ -218,6 +265,11 @@ test("mobile drawer traps focus, dismisses predictably, and restores layout stat
   await opener.click();
   await page.setViewportSize({ width: 1000, height: 844 });
   await expect(sidebar).toHaveJSProperty("inert", false);
+  await expect(sidebar).not.toHaveClass(/open/);
+  await expect(frame.locator("#sidebar-overlay")).not.toHaveClass(/open/);
+  const hamburger = frame.locator("#hamburger");
+  await expect(hamburger).toHaveAttribute("aria-expanded", "false");
+  expect(await hamburger.evaluate((button) => button.style.display)).toBe("");
   await expect(frame.locator("html")).toHaveAttribute(
     "data-pi-drawer-open",
     "false",

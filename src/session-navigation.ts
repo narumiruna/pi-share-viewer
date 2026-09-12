@@ -54,6 +54,8 @@ export function installSessionNavigation(
     "tree-search",
   ) as HTMLInputElement | null;
   const content = document.getElementById("content");
+  const messages = document.getElementById("messages");
+  const header = document.querySelector<HTMLElement>(".header");
   const tree = document.getElementById("tree-container");
   if (!sidebar || !overlay || !hamburger || !search || !content || !tree) {
     return () => undefined;
@@ -292,15 +294,25 @@ export function installSessionNavigation(
     }
   };
   const onLayoutChange = () => {
-    if (mobile.matches) setDrawer(false, false);
-    else {
-      sidebar.inert = false;
-      document.documentElement.dataset.piDrawerOpen = "false";
-    }
+    setDrawer(false, false);
+    scheduleReadingLocation();
   };
+  const resizeObserver =
+    typeof ResizeObserver === "function"
+      ? new ResizeObserver(scheduleReadingLocation)
+      : undefined;
+  resizeObserver?.observe(content);
+  if (messages) resizeObserver?.observe(messages);
+  if (header) resizeObserver?.observe(header);
 
   document.addEventListener("pi-session-tree-render", onTreeRender);
   document.addEventListener("pi-session-render", onSessionRender);
+  document.addEventListener("pi-session-layout-refresh", onLayoutChange);
+  document.addEventListener(
+    "pi-session-content-layout",
+    scheduleReadingLocation,
+  );
+  document.addEventListener("toggle", scheduleReadingLocation, true);
   document.addEventListener("keydown", onKeyDown, true);
   content.addEventListener("scroll", scheduleReadingLocation, {
     passive: true,
@@ -310,6 +322,7 @@ export function installSessionNavigation(
     passive: true,
   });
   mobile.addEventListener("change", onLayoutChange);
+  window.addEventListener("resize", scheduleReadingLocation);
   enhanceTree();
   onLayoutChange();
   scheduleReadingLocation();
@@ -319,10 +332,18 @@ export function installSessionNavigation(
     cancelAnimationFrame(readingFrame);
     document.removeEventListener("pi-session-tree-render", onTreeRender);
     document.removeEventListener("pi-session-render", onSessionRender);
+    document.removeEventListener("pi-session-layout-refresh", onLayoutChange);
+    document.removeEventListener(
+      "pi-session-content-layout",
+      scheduleReadingLocation,
+    );
+    document.removeEventListener("toggle", scheduleReadingLocation, true);
     document.removeEventListener("keydown", onKeyDown, true);
     content.removeEventListener("scroll", scheduleReadingLocation);
     document.removeEventListener("scroll", scheduleReadingLocation, true);
     mobile.removeEventListener("change", onLayoutChange);
+    window.removeEventListener("resize", scheduleReadingLocation);
+    resizeObserver?.disconnect();
     hamburger.removeEventListener("click", openDrawer);
     overlay.removeEventListener("click", closeDrawer);
     closeButton?.removeEventListener("click", closeDrawer);

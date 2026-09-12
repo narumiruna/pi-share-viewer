@@ -274,6 +274,7 @@ function showRenderError(record: DiagramRecord, message: string): void {
   record.card.classList.remove("pi-mermaid-card");
   record.card.classList.add("pi-mermaid-error-card");
   record.card.dataset.piMermaidState = "error";
+  document.dispatchEvent(new CustomEvent("pi-session-content-layout"));
 }
 
 function parseSvg(markup: string): SVGSVGElement {
@@ -333,6 +334,7 @@ function setFallbackIsolation(record: DiagramRecord, active: boolean): void {
       item.element.inert = item.inert;
     }
     record.fullscreenIsolation = undefined;
+    document.dispatchEvent(new CustomEvent("pi-session-layout-refresh"));
     return;
   }
   if (record.fullscreenIsolation) return;
@@ -597,6 +599,7 @@ function mountRenderedDiagram(
     toolbarControls.setZoom(Math.round(controller.getState().scale * 100));
   });
   focusTarget(record);
+  document.dispatchEvent(new CustomEvent("pi-session-content-layout"));
 }
 
 async function rerenderRecord(
@@ -639,6 +642,7 @@ async function rerenderRecord(
   } else {
     view.controller.refresh();
   }
+  document.dispatchEvent(new CustomEvent("pi-session-content-layout"));
 }
 
 function scheduleInitialRender(record: DiagramRecord, priority: number): void {
@@ -936,21 +940,20 @@ mutationObserver.observe(document.body, {
   childList: true,
   subtree: true,
 });
-window.addEventListener(
-  "pagehide",
-  () => {
-    mutationObserver.disconnect();
-    document.removeEventListener(
-      "pi-share-viewer-renderer-ready",
-      onRendererReady,
-    );
-    mathRenderer.destroy();
-    visibilityObserver?.disconnect();
-    renderQueue.destroy();
-    for (const record of [...records.values()]) disposeRecord(record);
-  },
-  { once: true },
-);
+const onPageHide = (event: PageTransitionEvent) => {
+  if (event.persisted) return;
+  window.removeEventListener("pagehide", onPageHide);
+  mutationObserver.disconnect();
+  document.removeEventListener(
+    "pi-share-viewer-renderer-ready",
+    onRendererReady,
+  );
+  mathRenderer.destroy();
+  visibilityObserver?.disconnect();
+  renderQueue.destroy();
+  for (const record of [...records.values()]) disposeRecord(record);
+};
+window.addEventListener("pagehide", onPageHide);
 scheduleScan();
 
 const enhancerRuntime = document.currentScript;

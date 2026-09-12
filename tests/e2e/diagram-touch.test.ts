@@ -127,7 +127,7 @@ test("fallback fullscreen cleans up cancelled touch pointers", async ({
   await mockGist(page, await createReviewExportFixture());
   await page.goto(`/session/#${DARK_GIST_ID}`);
   const frame = page.frameLocator("#preview");
-  const card = frame.locator('[id="11111111-diagram-2"]');
+  const card = frame.locator('[id="11111111-diagram-1"]');
   await card.scrollIntoViewIfNeeded();
   await expect(card).toHaveAttribute("data-pi-mermaid-state", "rendered", {
     timeout: 30_000,
@@ -155,6 +155,20 @@ test("fallback fullscreen cleans up cancelled touch pointers", async ({
     type: "touchCancel",
     touchPoints: [],
   });
+  const node = card.locator("g.node[data-pi-tone]").first();
+  const nodeBox = await node.boundingBox();
+  if (!nodeBox) throw new Error("Fallback diagram node missing");
+  const nodeX = nodeBox.x + nodeBox.width / 2;
+  const nodeY = nodeBox.y + nodeBox.height / 2;
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [{ x: nodeX, y: nodeY }],
+  });
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchEnd",
+    touchPoints: [],
+  });
+  await expect(node).toHaveAttribute("data-pi-selected", "true");
   const before = await stage.getAttribute("style");
   await cdp.send("Input.dispatchTouchEvent", {
     type: "touchStart",

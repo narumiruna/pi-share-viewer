@@ -3,6 +3,7 @@ import { installSessionNavigation } from "./session-navigation.js";
 import { installSessionStyle } from "./session-style.js";
 
 export type SessionMode = "inspect" | "reading";
+type SessionDisclosure = "system-prompt" | "tools-list";
 
 interface SessionRenderDetail {
   currentLeafId?: unknown;
@@ -52,6 +53,8 @@ function createDisclosure(
   container: HTMLElement,
   label: string,
   defaultOpen: boolean,
+  kind: SessionDisclosure,
+  onToggle: (open: boolean) => void,
 ): void {
   if (container.dataset.piDisclosure === "true") return;
   container.dataset.piDisclosure = "true";
@@ -61,9 +64,13 @@ function createDisclosure(
   details.classList.remove("expandable", "expanded");
   details.classList.add("pi-session-disclosure");
   details.dataset.piDisclosure = "true";
+  details.dataset.piDisclosureKind = kind;
   details.open = defaultOpen;
   const summary = document.createElement("summary");
   summary.textContent = label;
+  summary.addEventListener("click", () => {
+    setTimeout(() => onToggle(details.open), 0);
+  });
   const body = document.createElement("div");
   body.className = "pi-session-disclosure-body";
   for (const child of [...container.childNodes]) {
@@ -127,6 +134,10 @@ export function installSessionUi(): () => void {
   let mode: SessionMode = "reading";
   let showThinking = false;
   let showTools = false;
+  const disclosureState: Record<SessionDisclosure, boolean | undefined> = {
+    "system-prompt": undefined,
+    "tools-list": undefined,
+  };
   const copySequences = new WeakMap<HTMLButtonElement, number>();
   const boundDisclosures = new WeakSet<HTMLButtonElement>();
 
@@ -152,12 +163,23 @@ export function installSessionUi(): () => void {
       const active = button.dataset.mode === mode;
       button.setAttribute("aria-pressed", String(active));
     }
+    document.dispatchEvent(new CustomEvent("pi-session-content-layout"));
   };
 
   const setMode = (nextMode: SessionMode) => {
     mode = nextMode;
     showThinking = nextMode === "inspect";
     showTools = nextMode === "inspect";
+    for (const details of document.querySelectorAll<HTMLDetailsElement>(
+      "details[data-pi-disclosure-kind]",
+    )) {
+      const kind = details.dataset.piDisclosureKind as
+        | SessionDisclosure
+        | undefined;
+      if (kind && disclosureState[kind] === undefined) {
+        details.open = nextMode === "inspect";
+      }
+    }
     applyPreferences();
   };
 
@@ -211,16 +233,31 @@ export function installSessionUi(): () => void {
       });
     }
 
-    const open = mode === "inspect";
     for (const prompt of document.querySelectorAll<HTMLElement>(
       ".system-prompt:not([data-pi-disclosure])",
     )) {
-      createDisclosure(prompt, "System Prompt", open);
+      createDisclosure(
+        prompt,
+        "System Prompt",
+        disclosureState["system-prompt"] ?? mode === "inspect",
+        "system-prompt",
+        (open) => {
+          disclosureState["system-prompt"] = open;
+        },
+      );
     }
     for (const tools of document.querySelectorAll<HTMLElement>(
       ".tools-list:not([data-pi-disclosure])",
     )) {
-      createDisclosure(tools, "Available Tools", open);
+      createDisclosure(
+        tools,
+        "Available Tools",
+        disclosureState["tools-list"] ?? mode === "inspect",
+        "tools-list",
+        (open) => {
+          disclosureState["tools-list"] = open;
+        },
+      );
     }
     applyPreferences();
   };

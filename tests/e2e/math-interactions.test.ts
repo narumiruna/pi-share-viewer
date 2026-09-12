@@ -157,6 +157,28 @@ test("formula source controls copy exact original expressions and preserve seman
   await inline.getByRole("button", { name: "Copy LaTeX" }).press("Escape");
 });
 
+test("formula Escape does not trigger session navigation", async ({ page }) => {
+  await mockGist(page, await createReviewExportFixture());
+  await page.goto(`/session/#${DARK_GIST_ID}`);
+  const frame = page.frameLocator("#preview");
+  const shell = frame.locator(".pi-math-shell").first();
+  const sourceButton = shell.getByRole("button", { name: "Formula source" });
+  await sourceButton.click();
+  const search = frame.getByRole("textbox", {
+    name: "Search session navigation",
+  });
+  await search.evaluate((input: HTMLInputElement) => {
+    input.value = "NEBULA-ANCHOR";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await expect(search).toHaveValue("NEBULA-ANCHOR");
+
+  await shell.getByRole("button", { name: "Copy LaTeX" }).press("Escape");
+  await expect(shell.locator(".pi-math-source-popover")).toBeHidden();
+  await expect(sourceButton).toBeFocused();
+  await expect(search).toHaveValue("NEBULA-ANCHOR");
+});
+
 test("formula controls stay outside Markdown links", async ({ page }) => {
   const html = replaceSessionText(
     await createReviewExportFixture(),
@@ -182,6 +204,35 @@ test("formula controls stay outside Markdown links", async ({ page }) => {
   await expect(shell.locator(".pi-math-source-popover code")).toHaveText("$q$");
   await expect(link).toHaveAttribute("href", "https://example.com");
   await expect(frame.locator("#entry-11111111")).toBeVisible();
+});
+
+test("linked formulas retain separate source controls", async ({ page }) => {
+  const html = replaceSessionText(
+    await createReviewExportFixture(),
+    "Review the session viewer reading workflow.",
+    "[Linked values $x$ and $y$](https://example.com) in the session viewer reading workflow.",
+  );
+  await mockGist(page, html);
+  await page.goto(`/session/#${DARK_GIST_ID}`);
+  const frame = page.frameLocator("#preview");
+  const link = frame.getByRole("link", { name: /Linked values/ });
+  const shell = frame.locator(".pi-math-shell").filter({ has: link });
+  const sourceButtons = shell.getByRole("button", { name: "Formula source" });
+  await expect(sourceButtons).toHaveCount(2, { timeout: 15_000 });
+  await expect(link.getByRole("button")).toHaveCount(0);
+
+  await sourceButtons.nth(0).click();
+  await expect(shell.locator(".pi-math-source-popover code").nth(0)).toHaveText(
+    "$x$",
+  );
+  await shell
+    .getByRole("button", { name: "Copy LaTeX" })
+    .nth(0)
+    .press("Escape");
+  await sourceButtons.nth(1).click();
+  await expect(shell.locator(".pi-math-source-popover code").nth(1)).toHaveText(
+    "$y$",
+  );
 });
 
 test("formula dismissal listeners exist only while a popover is open", async ({
@@ -278,7 +329,28 @@ test("formula dismissal listeners exist only while a popover is open", async ({
   });
 });
 
-test("limited formulas keep exact source-copy controls", async ({ page }) => {
+test("persisted pagehide keeps formula enhancements active", async ({
+  page,
+}) => {
+  await mockGist(page, await createReviewExportFixture());
+  await page.goto(`/session/#${DARK_GIST_ID}`);
+  const frame = page.frameLocator("#preview");
+  const shell = frame.locator(".pi-math-shell").first();
+  await expect(shell).toBeVisible({ timeout: 15_000 });
+  await frame.locator("body").evaluate(() => {
+    window.dispatchEvent(
+      new PageTransitionEvent("pagehide", { persisted: true }),
+    );
+  });
+
+  await shell.getByRole("button", { name: "Formula source" }).click();
+  await expect(shell.locator(".pi-math-source-popover")).toBeVisible();
+  await shell.getByRole("button", { name: "Copy LaTeX" }).press("Escape");
+});
+
+test("limited formulas remain readable without unbounded controls", async ({
+  page,
+}) => {
   const oversized = `$${"x".repeat(10_000)}$`;
   const html = replaceSessionText(
     await createReviewExportFixture(),
@@ -288,31 +360,13 @@ test("limited formulas keep exact source-copy controls", async ({ page }) => {
   await mockGist(page, html);
   await page.goto(`/session/#${DARK_GIST_ID}`);
   const frame = page.frameLocator("#preview");
-  const limited = frame.locator(".pi-math-shell", {
-    has: frame.locator('[data-pi-math-state="limited"]'),
-  });
+  const limited = frame.locator('[data-pi-math-state="limited"]');
   await expect(limited).toHaveCount(1, { timeout: 15_000 });
-  await frame.locator("body").evaluate(() => {
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: {
-        writeText: (text: string) => {
-          (window as Window & { copiedFormula?: string }).copiedFormula = text;
-          return Promise.resolve();
-        },
-      },
-    });
-  });
-  await limited.getByRole("button", { name: "Formula source" }).click();
-  await expect(limited.locator(".pi-math-source-popover code")).toHaveText(
-    oversized,
+  await expect(limited).toHaveText(oversized);
+  await expect(frame.locator(".pi-math-shell", { has: limited })).toHaveCount(
+    0,
   );
-  await limited.getByRole("button", { name: "Copy LaTeX" }).click();
-  expect(
-    await frame
-      .locator("body")
-      .evaluate(
-        () => (window as Window & { copiedFormula?: string }).copiedFormula,
-      ),
-  ).toBe(oversized);
+  await expect(
+    frame.getByRole("button", { name: "Formula source" }),
+  ).toHaveCount(7);
 });

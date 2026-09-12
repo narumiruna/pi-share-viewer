@@ -146,6 +146,45 @@ describe("diagram view", () => {
     view.destroy();
   });
 
+  test("does not suppress a tap after a cancelled touch gesture", () => {
+    const { stage, viewport } = makeView();
+    const node = stage
+      .querySelector("svg")
+      ?.appendChild(
+        document.createElementNS("http://www.w3.org/2000/svg", "g"),
+      );
+    if (!node) throw new Error("Diagram node fixture failed");
+    node.dataset.piTone = "accent";
+    const touch = (type: string, x: number, y: number) => {
+      const event = new MouseEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        clientX: x,
+        clientY: y,
+      });
+      Object.defineProperties(event, {
+        pointerId: { value: 1 },
+        pointerType: { value: "touch" },
+      });
+      return event;
+    };
+    const activated = vi.fn();
+    node.addEventListener("click", activated);
+    const view = createDiagramView(viewport, stage, {
+      isExpanded: () => true,
+    });
+
+    node.dispatchEvent(touch("pointerdown", 100, 100));
+    node.dispatchEvent(touch("pointermove", 130, 100));
+    node.dispatchEvent(touch("pointercancel", 130, 100));
+    const tap = new MouseEvent("click", { bubbles: true, cancelable: true });
+    node.dispatchEvent(tap);
+
+    expect(tap.defaultPrevented).toBe(false);
+    expect(activated).toHaveBeenCalledOnce();
+    view.destroy();
+  });
+
   test("supports keyboard zoom, fit, and escape", () => {
     const { stage, viewport } = makeView();
     const onEscape = vi.fn();

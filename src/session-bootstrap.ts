@@ -1,7 +1,9 @@
 import { createMathParser, type PiMarkdownParser } from "./math-source.js";
+import { isMermaidRendererReady } from "./mermaid-render-protocol.js";
 import { installSessionUi } from "./session-ui.js";
 
 const MAX_RUNTIME_BYTES = 8 * 1024 * 1024;
+const RENDERER_PROBE_TIMEOUT_MS = 5_000;
 
 interface RuntimeMessage {
   kind: "enhancer" | "renderer";
@@ -66,7 +68,48 @@ if (compatible) {
   installSessionUi();
 }
 
+function escapeInlineScript(source: string): string {
+  return source.replace(/<\/script/gi, "<\\/script");
+}
+
+function verifyRenderer(source: string): Promise<void> {
+  const html = `<!doctype html><html><head><meta charset="UTF-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; connect-src 'none'; object-src 'none'; base-uri 'none'"></head><body><script>${escapeInlineScript(source)}</script></body></html>`;
+  const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
+  const frame = document.createElement("iframe");
+  frame.hidden = true;
+  frame.sandbox.add("allow-scripts");
+  frame.src = url;
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const cleanup = () => {
+      if (settled) return false;
+      settled = true;
+      window.clearTimeout(timer);
+      window.removeEventListener("message", onMessage);
+      frame.remove();
+      URL.revokeObjectURL(url);
+      return true;
+    };
+    const onMessage = (event: MessageEvent) => {
+      if (
+        event.source !== frame.contentWindow ||
+        !isMermaidRendererReady(event.data)
+      ) {
+        return;
+      }
+      if (cleanup()) resolve();
+    };
+    const timer = window.setTimeout(() => {
+      if (cleanup()) reject(new Error("Renderer failed to initialize."));
+    }, RENDERER_PROBE_TIMEOUT_MS);
+    window.addEventListener("message", onMessage);
+    document.body.append(frame);
+  });
+}
+
 let enhancerInstalled = false;
+let rendererInstalling = false;
 let rendererSource: string | undefined;
 Object.defineProperty(globalThis, "__PI_MERMAID_RENDERER_SOURCE__", {
   configurable: false,
@@ -80,12 +123,28 @@ window.addEventListener("message", (event: MessageEvent) => {
   }
   const message = event.data;
   if (message.kind === "renderer") {
-    rendererSource = message.source;
-    document.dispatchEvent(new CustomEvent("pi-share-viewer-renderer-ready"));
-    window.parent.postMessage(
-      { type: "pi-share-viewer-runtime-active", loadId, kind: "renderer" },
-      "*",
-    );
+    if (rendererSource || rendererInstalling) return;
+    rendererInstalling = true;
+    void verifyRenderer(message.source)
+      .then(() => {
+        rendererSource = message.source;
+        document.dispatchEvent(
+          new CustomEvent("pi-share-viewer-renderer-ready"),
+        );
+        window.parent.postMessage(
+          { type: "pi-share-viewer-runtime-active", loadId, kind: "renderer" },
+          "*",
+        );
+      })
+      .catch(() => {
+        window.parent.postMessage(
+          { type: "pi-share-viewer-runtime-failed", loadId, kind: "renderer" },
+          "*",
+        );
+      })
+      .finally(() => {
+        rendererInstalling = false;
+      });
     return;
   }
   if (enhancerInstalled) return;

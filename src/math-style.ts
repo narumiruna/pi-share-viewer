@@ -32,7 +32,8 @@ export function installMathStyle(): void {
 }
 [data-pi-session-ui="radix"] .pi-math-controls { display: inline; }
 [data-pi-session-ui="radix"] .pi-math-source-button {
-  position: absolute; z-index: 3; top: -1.1rem; right: 0;
+  position: absolute; z-index: 3; top: -1.1rem;
+  right: calc(var(--pi-math-control-index, 0) * 34px);
   min-width: 30px; min-height: 30px; border: 1px solid var(--borderMuted);
   border-radius: 4px; background: var(--container-bg); color: var(--accent);
   padding: 2px 5px; font: 700 11px/1 ui-monospace, monospace;
@@ -43,7 +44,8 @@ export function installMathStyle(): void {
   opacity: 1;
 }
 [data-pi-session-ui="radix"] .pi-math-source-popover {
-  display: grid; position: absolute; z-index: 4; top: 1.4rem; right: 0;
+  display: grid; position: absolute; z-index: 4; top: 1.4rem;
+  right: calc(var(--pi-math-control-index, 0) * 34px);
   width: min(22rem, calc(100vw - 2rem)); max-height: 16rem; gap: 8px;
   overflow: auto; border: 1px solid var(--border); border-radius: 6px;
   background: var(--container-bg); color: var(--text); padding: 10px;

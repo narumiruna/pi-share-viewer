@@ -205,6 +205,47 @@ test("enhancer 503 and timeout retain raw source and offer retry", async ({
   ).toHaveCount(6, { timeout: 15_000 });
 });
 
+test("renderer initialization failure keeps retry available", async ({
+  page,
+}) => {
+  test.setTimeout(35_000);
+  await mockGist(page, await createReviewExportFixture());
+  let failRenderer = true;
+  await page.route("**/assets/mermaid-renderer.js", async (route) => {
+    if (failRenderer) {
+      await route.fulfill({
+        body: 'throw new Error("broken renderer fixture");',
+        contentType: "application/javascript",
+        status: 200,
+      });
+    } else {
+      await route.fallback();
+    }
+  });
+  await page.goto(`/session/#${DARK_GIST_ID}`);
+  const frame = page.frameLocator("#preview");
+  const card = frame.locator('[id="11111111-diagram-1"]');
+  await card.scrollIntoViewIfNeeded();
+  await expect(page.locator("#enhancement-message")).toContainText(
+    "Renderer failed to initialize",
+    { timeout: 15_000 },
+  );
+  await expect(
+    page.getByRole("button", { name: "Retry enhancements" }),
+  ).toBeVisible();
+  await expect(card).toHaveAttribute(
+    "data-pi-mermaid-state",
+    "waiting-runtime",
+  );
+
+  failRenderer = false;
+  await page.getByRole("button", { name: "Retry enhancements" }).click();
+  await expect(card).toHaveAttribute("data-pi-mermaid-state", "rendered", {
+    timeout: 30_000,
+  });
+  await expect(page.locator("#enhancement-status")).toBeHidden();
+});
+
 test("enhancer initialization failure keeps retry available", async ({
   page,
 }) => {
@@ -244,6 +285,54 @@ test("enhancer initialization failure keeps retry available", async ({
     "same-frame",
   );
   await expect(page.locator("#enhancement-status")).toBeHidden();
+});
+
+test("bootstrap failures and missing readiness stay retryable", async ({
+  page,
+}) => {
+  test.setTimeout(30_000);
+  await mockGist(page, await createReviewExportFixture());
+  let attempt = 0;
+  await page.route("**/assets/mermaid-bootstrap.js", async (route) => {
+    attempt += 1;
+    if (attempt === 1) {
+      await route.fulfill({ status: 503, body: "bootstrap unavailable" });
+      return;
+    }
+    if (attempt === 2) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/javascript",
+        body: 'throw new Error("broken bootstrap fixture");',
+      });
+      return;
+    }
+    await route.fallback();
+  });
+
+  await page.goto(`/session/#${DARK_GIST_ID}`);
+  await expect(
+    page.getByRole("button", { name: "Retry session" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Retry session" }).click();
+  const frame = page.frameLocator("#preview");
+  await expect(
+    frame
+      .locator("#entry-22222222")
+      .getByText(/base conversation is readable before optional rendering/i),
+  ).toBeVisible();
+  await expect(page.locator("#enhancement-message")).toContainText(
+    "Session bootstrap failed to initialize",
+    { timeout: 10_000 },
+  );
+  await expect(
+    page.getByRole("button", { name: "Retry enhancements" }),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Retry enhancements" }).click();
+  await expect(
+    frame.locator('.pi-math[data-pi-math-state="rendered"]'),
+  ).toHaveCount(6, { timeout: 15_000 });
 });
 
 test("transient session failures retry, terminal exports never enter the iframe", async ({

@@ -14,13 +14,15 @@ function installFormulaView(
 ): InstalledMathView {
   element.dataset.piMathSource = source;
   const display = element.dataset.piMathDisplay === "true";
+  const owner =
+    element.dataset.piMathView ?? `pi-math-owner-${++mathViewSequence}`;
+  element.dataset.piMathView = owner;
   const existing = element.closest<HTMLElement>(".pi-math-shell");
   const shell = existing ?? document.createElement("span");
   shell.classList.add("pi-math-shell");
-  shell.dataset.piMathDisplay = String(display);
 
   for (const stale of shell.querySelectorAll<HTMLElement>(
-    ":scope > .pi-math-controls, :scope > .pi-math-overflow-hint",
+    `:scope > [data-pi-math-owner="${owner}"]`,
   )) {
     stale.remove();
   }
@@ -33,10 +35,18 @@ function installFormulaView(
     wrapped.replaceWith(shell);
     shell.append(wrapped);
   }
+  const formulas = [...shell.querySelectorAll<HTMLElement>(".pi-math")];
+  const controlIndex = Math.max(0, formulas.indexOf(element));
+  shell.dataset.piMathDisplay = String(
+    formulas.some((formula) => formula.dataset.piMathDisplay === "true"),
+  );
+  shell.dataset.piMathCount = String(formulas.length);
 
   const id = `pi-math-${++mathViewSequence}`;
   const controls = document.createElement("span");
   controls.className = "pi-math-controls";
+  controls.dataset.piMathOwner = owner;
+  controls.style.setProperty("--pi-math-control-index", String(controlIndex));
   const sourceButton = document.createElement("button");
   sourceButton.type = "button";
   sourceButton.className = "pi-math-source-button";
@@ -61,6 +71,7 @@ function installFormulaView(
   controls.append(sourceButton, popover);
   const overflowHint = document.createElement("span");
   overflowHint.className = "pi-math-overflow-hint";
+  overflowHint.dataset.piMathOwner = owner;
   overflowHint.hidden = true;
   overflowHint.setAttribute("aria-hidden", "true");
   shell.append(controls, overflowHint);
@@ -73,7 +84,13 @@ function installFormulaView(
   const onDocumentKey = (event: KeyboardEvent) => {
     if (event.key !== "Escape" || popover.hidden) return;
     event.preventDefault();
-    event.stopPropagation();
+    event.stopImmediatePropagation();
+    close(true);
+  };
+  const onSessionEscape = (event: Event) => {
+    if (popover.hidden) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
     close(true);
   };
   const addDismissalListeners = () => {
@@ -81,12 +98,14 @@ function installFormulaView(
     dismissalListenersInstalled = true;
     document.addEventListener("pointerdown", onDocumentPointer, true);
     document.addEventListener("keydown", onDocumentKey, true);
+    document.addEventListener("pi-session-escape", onSessionEscape);
   };
   const removeDismissalListeners = () => {
     if (!dismissalListenersInstalled) return;
     dismissalListenersInstalled = false;
     document.removeEventListener("pointerdown", onDocumentPointer, true);
     document.removeEventListener("keydown", onDocumentKey, true);
+    document.removeEventListener("pi-session-escape", onSessionEscape);
   };
   const close = (restoreFocus: boolean) => {
     removeDismissalListeners();

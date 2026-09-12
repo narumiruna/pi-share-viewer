@@ -1,3 +1,4 @@
+export const MERMAID_RENDER_READY = "pi-mermaid-render-ready";
 export const MERMAID_RENDER_REQUEST = "pi-mermaid-render-request";
 export const MERMAID_RENDER_RESULT = "pi-mermaid-render-result";
 
@@ -20,6 +21,15 @@ export type MermaidRenderResult =
       requestId: string;
       type: typeof MERMAID_RENDER_RESULT;
     };
+
+export function isMermaidRendererReady(value: unknown): boolean {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    candidate.type === MERMAID_RENDER_READY &&
+    Object.keys(candidate).length === 1
+  );
+}
 
 export function isMermaidRenderResult(
   value: unknown,
