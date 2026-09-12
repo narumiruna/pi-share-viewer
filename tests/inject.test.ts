@@ -2,7 +2,7 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
-import { injectMermaidEnhancer } from "../src/inject.js";
+import { injectSessionViewer } from "../src/inject.js";
 import { prepareMathHook } from "../src/math-inject.js";
 import { isDarkColor } from "../src/theme.js";
 import { renderError } from "../src/ui.js";
@@ -14,12 +14,12 @@ const SESSION_HTML = `<!doctype html><html><head><title>Pi</title></head><body>
 
 describe("session enhancement injection", () => {
   test("adds restrictive metadata and an escaped runtime", () => {
-    const output = injectMermaidEnhancer(
+    const output = injectSessionViewer(
       SESSION_HTML,
       'globalThis.loaded = "</script><script>bad()</script>";',
-      "globalThis.rendererLoaded = true;",
       GIST_ID,
       "https://pi.narumi.dev",
+      "load-test-1234",
       "light",
       "leafId=1234abcd&targetId=abcdef12",
       "1234abcd-diagram-2",
@@ -31,10 +31,10 @@ describe("session enhancement injection", () => {
     expect(output).toContain("connect-src 'none'");
     expect(output).toContain("font-src data:");
     expect(output).toContain("frame-src blob:");
-    expect(output).toContain("__PI_MERMAID_RENDERER_SOURCE__");
-    expect(output).toContain("__PI_SHARE_VIEWER_THEME__");
-    expect(output).toContain('value: "light"');
-    expect(output).toContain("globalThis.rendererLoaded = true;");
+    expect(output).not.toContain("__PI_MERMAID_RENDERER_SOURCE__");
+    expect(output).not.toContain("globalThis.rendererLoaded = true;");
+    expect(output).toContain('name="pi-viewer-theme" content="light"');
+    expect(output).toContain('name="pi-load-id" content="load-test-1234"');
     expect(output).toContain(`https://pi.narumi.dev/session/#${GIST_ID}`);
     const document = new DOMParser().parseFromString(output, "text/html");
     expect(
@@ -52,12 +52,12 @@ describe("session enhancement injection", () => {
   });
 
   test("preserves a GitHub Pages base path in shared links", () => {
-    const output = injectMermaidEnhancer(
+    const output = injectSessionViewer(
       SESSION_HTML,
       "runtime",
-      "renderer",
       GIST_ID,
       "https://narumiruna.github.io/pi-share-viewer/",
+      "load-test-1234",
     );
 
     expect(output).toContain(
@@ -70,12 +70,12 @@ describe("session enhancement injection", () => {
       "</body>",
       '<script>globalThis.template = "</body>";</script></body>',
     );
-    const output = injectMermaidEnhancer(
+    const output = injectSessionViewer(
       sessionWithTemplate,
       "globalThis.enhanced = true;",
-      "globalThis.rendererLoaded = true;",
       GIST_ID,
       "http://localhost:4173",
+      "load-test-1234",
     );
 
     expect(output.indexOf("globalThis.template")).toBeLessThan(
@@ -85,30 +85,30 @@ describe("session enhancement injection", () => {
 
   test("rejects arbitrary HTML and insecure viewer origins", () => {
     expect(() =>
-      injectMermaidEnhancer(
+      injectSessionViewer(
         "<html><head></head><body>malicious</body></html>",
         "runtime",
-        "renderer",
         GIST_ID,
         "https://pi.narumi.dev",
+        "load-test-1234",
       ),
     ).toThrow("not a supported Pi session");
     expect(() =>
-      injectMermaidEnhancer(
+      injectSessionViewer(
         SESSION_HTML,
         "runtime",
-        "renderer",
         GIST_ID,
         "http://example.com",
+        "load-test-1234",
       ),
     ).toThrow("must use HTTPS");
     expect(() =>
-      injectMermaidEnhancer(
+      injectSessionViewer(
         SESSION_HTML,
         "runtime",
-        "renderer",
         GIST_ID,
         "https://pi.narumi.dev",
+        "load-test-1234",
         undefined,
         "",
         "unsafe-diagram-1",
@@ -139,12 +139,12 @@ describe("version-scoped math hook", () => {
       `\${safeMarkedParse(entry.summary)}`,
     );
     expect(root.getElementById("session-data")?.textContent).toBe("e30=");
-    const output = injectMermaidEnhancer(
+    const output = injectSessionViewer(
       fixture().documentElement.outerHTML,
       "globalThis.mathTestRuntime = true;",
-      "renderer",
       GIST_ID,
       "https://example.com",
+      "load-test-1234",
     );
     expect(output.indexOf("/* hljs */")).toBeLessThan(
       output.indexOf("globalThis.mathTestRuntime"),

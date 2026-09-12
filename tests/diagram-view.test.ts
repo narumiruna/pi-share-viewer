@@ -58,12 +58,23 @@ describe("diagram view", () => {
     view.destroy();
   });
 
-  test("fits an oversized diagram without upscaling it", () => {
+  test("starts an oversized diagram in readable mode and exposes overview", () => {
     const { stage, viewport } = makeView(400, 200, 800, 200);
     const view = createDiagramView(viewport, stage);
 
-    expect(view.getState().scale).toBe(0.5);
-    expect(view.getState().x).toBe(0);
+    expect(view.getState()).toMatchObject({
+      cameraMode: "readable",
+      scale: 1,
+      x: 0,
+    });
+    expect(viewport.dataset.piDiagramCropped).toBe("true");
+    view.setCameraMode("overview");
+    expect(view.getState()).toMatchObject({
+      cameraMode: "overview",
+      scale: 0.5,
+      x: 0,
+    });
+    expect(viewport.dataset.piDiagramCropped).toBe("false");
     view.destroy();
   });
 
@@ -75,6 +86,8 @@ describe("diagram view", () => {
     (width, height, scale) => {
       const { stage, viewport } = makeView(400, 200, width, height);
       const view = createDiagramView(viewport, stage);
+      expect(view.getState().scale).toBe(1);
+      view.fit();
       expect(view.getState().scale).toBe(scale);
       view.zoomBy(0.8);
       expect(view.getState().scale).toBe(scale);

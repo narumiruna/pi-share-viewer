@@ -34,7 +34,8 @@ const SESSION_STYLE = `
   --thinkingText: ${slateDark.slate11};
   --scrollbarTrack: transparent;
   --scrollbarThumb: ${slateDark.slate7};
-  --userMessageBg: color-mix(in srgb, ${slateDark.slate2} 92%, ${tealDark.teal2});
+  --userMessageBg: color-mix(in srgb, ${slateDark.slate2} 82%, ${tealDark.teal3});
+  --assistantMessageBg: ${slateDark.slate2};
   --userMessageText: ${slateDark.slate12};
   --customMessageBg: ${violetDark.violet2};
   --customMessageText: ${slateDark.slate12};
@@ -73,7 +74,8 @@ const SESSION_STYLE = `
   --text: ${slate.slate12};
   --thinkingText: ${slate.slate11};
   --scrollbarThumb: ${slate.slate8};
-  --userMessageBg: ${slate.slate1};
+  --userMessageBg: ${teal.teal2};
+  --assistantMessageBg: ${slate.slate1};
   --userMessageText: ${slate.slate12};
   --customMessageBg: ${violet.violet2};
   --customMessageText: ${slate.slate12};
@@ -373,6 +375,176 @@ const SESSION_STYLE = `
   background: var(--container-bg);
   color: var(--text);
 }
+[data-pi-session-ui="radix"] .pi-session-modes {
+  display: inline-flex;
+  gap: 4px;
+  margin: 0 0 10px;
+  padding: 3px;
+  border: 1px solid var(--borderMuted);
+  border-radius: 6px;
+  background: var(--body-bg);
+}
+[data-pi-session-ui="radix"] .pi-session-mode {
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+[data-pi-session-ui="radix"] .pi-session-mode[aria-pressed="true"] {
+  background: var(--selectedBg);
+  color: var(--text);
+  font-weight: 700;
+}
+[data-pi-session-ui="radix"][data-pi-session-mode="reading"] .header-info {
+  grid-template-columns: repeat(3, minmax(0, auto));
+  gap: 4px 16px;
+}
+[data-pi-session-ui="radix"][data-pi-session-mode="reading"] .header-info .info-item:nth-child(n+4) {
+  display: none;
+}
+[data-pi-session-ui="radix"] .pi-session-disclosure {
+  margin: 8px 0;
+  padding: 0;
+  border: 1px solid var(--borderMuted);
+  border-radius: 5px;
+  background: var(--container-bg);
+}
+[data-pi-session-ui="radix"] .pi-session-disclosure > summary {
+  min-height: 40px;
+  padding: 10px 14px;
+  color: var(--text);
+  font-weight: 700;
+  cursor: pointer;
+}
+[data-pi-session-ui="radix"] .pi-session-disclosure-body {
+  padding: 0 14px 14px;
+}
+[data-pi-session-ui="radix"] .pi-message-role {
+  display: flex;
+  align-items: center;
+  min-height: 24px;
+  margin: 0 20px 8px;
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+[data-pi-session-ui="radix"] .user-message > .pi-message-role {
+  margin-inline: 0;
+  color: var(--accent);
+}
+[data-pi-session-ui="radix"] .assistant-message {
+  background: var(--assistantMessageBg);
+  border-left: 3px solid var(--borderAccent);
+}
+[data-pi-session-ui="radix"] .user-message {
+  border-left: 3px solid var(--accent);
+}
+[data-pi-session-ui="radix"] .tool-execution > .pi-message-role {
+  margin: 0 0 6px;
+  color: var(--warning);
+}
+[data-pi-session-ui="radix"] .pi-entry-disclosure {
+  min-height: 32px;
+  border: 1px solid var(--borderMuted);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--accent);
+  padding: 4px 8px;
+  cursor: pointer;
+}
+[data-pi-session-ui="radix"] .tool-execution[data-pi-details-open="false"] > :not(.pi-message-role, .pi-entry-disclosure, .message-timestamp) {
+  display: none !important;
+}
+[data-pi-session-ui="radix"][data-pi-show-tools="false"] .tool-execution:not([data-pi-revealed="true"]) {
+  display: none !important;
+}
+[data-pi-session-ui="radix"][data-pi-show-thinking="false"] .thinking-text {
+  display: none !important;
+}
+[data-pi-session-ui="radix"][data-pi-show-thinking="false"] .thinking-collapsed {
+  display: block !important;
+}
+[data-pi-session-ui="radix"][data-pi-show-thinking="true"] .thinking-text {
+  display: block !important;
+}
+[data-pi-session-ui="radix"][data-pi-show-thinking="true"] .thinking-collapsed {
+  display: none !important;
+}
+[data-pi-session-ui="radix"] .copy-link-btn {
+  opacity: 0;
+}
+[data-pi-session-ui="radix"] :is(.user-message, .assistant-message, .skill-user-entry):is(:focus-within, :hover) > .copy-link-btn,
+[data-pi-session-ui="radix"] .copy-link-btn:focus-visible {
+  opacity: 1;
+}
+[data-pi-session-ui="radix"] .pi-action-status {
+  display: inline-flex;
+  position: relative;
+  z-index: 1;
+  max-width: calc(100% - 52px);
+  min-height: 28px;
+  align-items: center;
+  margin: 0 48px 6px 20px;
+  color: var(--accent);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+[data-pi-session-ui="radix"] .pi-navigation-filter-label {
+  flex-basis: 100%;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+[data-pi-session-ui="radix"] .pi-tree-action {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 30px;
+  align-items: flex-start;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+[data-pi-session-ui="radix"] .pi-tree-action:focus-visible {
+  border-radius: 3px;
+}
+[data-pi-session-ui="radix"] .tree-node.current-reading {
+  box-shadow: inset 3px 0 var(--borderAccent);
+}
+[data-pi-session-ui="radix"] .tree-node.current-reading:not(.active) {
+  background: color-mix(in srgb, var(--borderAccent) 8%, transparent);
+}
+[data-pi-session-ui="radix"] .pi-search-snippet {
+  display: block;
+  flex-basis: 100%;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 10px;
+  white-space: normal;
+}
+[data-pi-session-ui="radix"] .pi-navigation-empty {
+  margin: 12px 8px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+[data-pi-session-ui="radix"][data-pi-drawer-open="true"] body {
+  overflow: hidden;
+}
+@media (hover: none), (pointer: coarse) {
+  [data-pi-session-ui="radix"] .copy-link-btn { opacity: 1; }
+  [data-pi-session-ui="radix"] :is(.copy-link-btn, .filter-btn, .header-toggle-btn, .download-json-btn, .sidebar-close, #hamburger, .pi-entry-disclosure) {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
 @media (max-width: 900px) {
   [data-pi-session-ui="radix"] #sidebar {
     width: min(var(--sidebar-width), calc(100vw - 40px));
@@ -385,8 +557,19 @@ const SESSION_STYLE = `
   [data-pi-session-ui="radix"] #content {
     padding: 68px 14px 48px;
   }
-  [data-pi-session-ui="radix"] .header-info {
+  [data-pi-session-ui="radix"] .header-info,
+  [data-pi-session-ui="radix"][data-pi-session-mode="reading"] .header-info {
     grid-template-columns: 1fr;
+  }
+  [data-pi-session-ui="radix"] .help-bar,
+  [data-pi-session-ui="radix"] .help-actions,
+  [data-pi-session-ui="radix"] .sidebar-filters {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  [data-pi-session-ui="radix"] .message-timestamp {
+    padding-right: 52px !important;
+    overflow-wrap: anywhere;
   }
   [data-pi-session-ui="radix"] .user-message,
   [data-pi-session-ui="radix"] .assistant-text {
@@ -400,6 +583,7 @@ const SESSION_STYLE = `
 
 export function installSessionStyle(): void {
   document.documentElement.dataset.piSessionUi = "radix";
+  if (document.querySelector('style[data-pi-session-style="radix"]')) return;
   const style = document.createElement("style");
   style.dataset.piSessionStyle = "radix";
   style.textContent = SESSION_STYLE;

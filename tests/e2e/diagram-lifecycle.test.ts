@@ -32,6 +32,7 @@ test("exports SVG and PNG locally and opens stable diagram deep links", async ({
     });
   });
 
+  await card.getByRole("button", { name: "More diagram actions" }).click();
   await card.getByRole("button", { name: "Copy SVG" }).click();
   await expect
     .poll(() =>

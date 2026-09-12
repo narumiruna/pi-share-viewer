@@ -26,5 +26,10 @@ describe("installSessionStyle", () => {
       '[data-pi-session-ui="radix"] #sidebar',
     );
     expect(style?.textContent).toContain("@media (max-width: 900px)");
+    expect(style?.textContent).toContain('data-pi-session-mode="reading"');
+    expect(style?.textContent).toContain('data-pi-show-tools="false"');
+    expect(style?.textContent).toContain(".pi-message-role");
+    expect(style?.textContent).toContain(".tree-node.current-reading");
+    expect(style?.textContent).toContain("min-width: 44px");
   });
 });

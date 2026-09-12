@@ -8,19 +8,61 @@ const execFileAsync = promisify(execFile);
 export const DARK_GIST_ID = "2b736fe885c106e7ee125d52b1cfecbb";
 export const LIGHT_GIST_ID = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const generatedDirectory = resolve("tests/.generated");
-const generatedSession = resolve(
-  generatedDirectory,
-  `session-${process.pid}.html`,
-);
+const generatedSession = (name: string) =>
+  resolve(generatedDirectory, `${name}-${process.pid}.html`);
 
-export async function createExportFixture(): Promise<string> {
+async function exportFixture(name: string, fixture: string): Promise<string> {
   await mkdir(generatedDirectory, { recursive: true });
+  const output = generatedSession(name);
   await execFileAsync(resolve("node_modules/.bin/pi"), [
     "--export",
-    resolve("tests/fixtures/session.jsonl"),
-    generatedSession,
+    resolve(fixture),
+    output,
   ]);
-  return readFile(generatedSession, "utf8");
+  return readFile(output, "utf8");
+}
+
+export async function createExportFixture(): Promise<string> {
+  return exportFixture("session", "tests/fixtures/session.jsonl");
+}
+
+export async function createReviewExportFixture(): Promise<string> {
+  const html = await exportFixture(
+    "ui-review",
+    "tests/fixtures/ui-review.jsonl",
+  );
+  const match =
+    /(<script id="session-data" type="application\/json">\s*)([^<]+)(\s*<\/script>)/i.exec(
+      html,
+    );
+  if (!match) throw new Error("Pi export is missing session-data");
+  const payload = JSON.parse(
+    Buffer.from(match[2].trim(), "base64").toString("utf8"),
+  ) as Record<string, unknown>;
+  payload.systemPrompt = Array.from(
+    { length: 28 },
+    (_, index) =>
+      `Sanitized system instruction ${index + 1}: verify readable session behavior without secrets or live services.`,
+  ).join("\n");
+  payload.tools = ["read", "bash", "edit", "write", "review_status"].map(
+    (name) => ({
+      name,
+      description: `Sanitized ${name} tool definition with deliberately long technical metadata for responsive layout review.`,
+      parameters: {
+        type: "object",
+        properties: {
+          input: {
+            type: "string",
+            description:
+              "Sanitized fixture input used only by local browser tests.",
+          },
+        },
+        required: ["input"],
+      },
+    }),
+  );
+  const encoded = Buffer.from(JSON.stringify(payload)).toString("base64");
+  return html.replace(match[0], `${match[1]}${encoded}${match[3]}`);
 }
 
 export function replaceSessionText(

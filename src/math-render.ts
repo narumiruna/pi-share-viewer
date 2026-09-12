@@ -1,5 +1,6 @@
 import katex from "katex";
 import { readMath } from "./math-source.js";
+import { MathView } from "./math-view.js";
 
 export const MAX_MATH_SOURCE_BYTES = 10_000;
 export const MAX_MATH_COUNT = 500;
@@ -38,6 +39,7 @@ export function renderMath(element: HTMLElement, budget: MathBudget): void {
   // Ignore surrounding whitespace only for recognition; retain the original
   // source for failure fallback and byte-budget accounting.
   const source = raw.trim();
+  element.dataset.piMathSource = source;
   const math = readMath(source);
   if (!math || math.raw !== source) {
     element.dataset.piMathState = "error";
@@ -69,6 +71,7 @@ export function renderMath(element: HTMLElement, budget: MathBudget): void {
 
 export class MathRenderer {
   readonly budget = new MathBudget();
+  private mathView = new MathView();
   private seen = new WeakSet<HTMLElement>();
   private pending: HTMLElement[] = [];
   private timer: ReturnType<typeof setTimeout> | undefined;
@@ -76,6 +79,7 @@ export class MathRenderer {
 
   scan(root: Document): void {
     if (this.destroyed) return;
+    this.mathView.prune();
     for (const element of root.querySelectorAll<HTMLElement>(
       ":is(.user-message, .assistant-message, .skill-user-entry) .markdown-content .pi-math",
     )) {
@@ -85,8 +89,10 @@ export class MathRenderer {
       )
         continue;
       this.seen.add(element);
-      if (this.budget.exhausted) element.dataset.piMathState = "limited";
-      else this.pending.push(element);
+      if (this.budget.exhausted) {
+        element.dataset.piMathState = "limited";
+        this.mathView.install(element, (element.textContent ?? "").trim());
+      } else this.pending.push(element);
     }
     if (this.pending.length && this.timer === undefined) this.schedule();
   }
@@ -106,9 +112,14 @@ export class MathRenderer {
   }
 
   private process(element: HTMLElement): void {
-    if (!element.isConnected) this.seen.delete(element);
-    else if (this.budget.exhausted) element.dataset.piMathState = "limited";
+    if (!element.isConnected) {
+      this.seen.delete(element);
+      return;
+    }
+    const source = (element.textContent ?? "").trim();
+    if (this.budget.exhausted) element.dataset.piMathState = "limited";
     else renderMath(element, this.budget);
+    this.mathView.install(element, source);
   }
 
   destroy(): void {
@@ -116,5 +127,6 @@ export class MathRenderer {
     clearTimeout(this.timer);
     this.timer = undefined;
     this.pending = [];
+    this.mathView.destroy();
   }
 }

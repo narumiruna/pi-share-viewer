@@ -3,10 +3,22 @@ import { defineConfig } from "vite";
 import { loadKatexCss } from "./build/katex-css.js";
 
 export default defineConfig(({ mode }) => {
-  if (mode !== "enhancer" && mode !== "renderer") {
+  if (!["bootstrap", "enhancer", "renderer"].includes(mode)) {
     throw new Error(`Unsupported runtime mode: ${mode}`);
   }
   const enhancer = mode === "enhancer";
+  const entry =
+    mode === "bootstrap"
+      ? "src/session-bootstrap.ts"
+      : mode === "enhancer"
+        ? "src/enhancer.ts"
+        : "src/mermaid-renderer.ts";
+  const name =
+    mode === "bootstrap"
+      ? "PiSessionBootstrap"
+      : mode === "enhancer"
+        ? "PiMermaidEnhancer"
+        : "PiMermaidRenderer";
 
   return {
     define: {
@@ -18,12 +30,9 @@ export default defineConfig(({ mode }) => {
       outDir: resolve(import.meta.dirname, "public/assets"),
       emptyOutDir: false,
       lib: {
-        entry: resolve(
-          import.meta.dirname,
-          enhancer ? "src/enhancer.ts" : "src/mermaid-renderer.ts",
-        ),
+        entry: resolve(import.meta.dirname, entry),
         formats: ["iife"],
-        name: enhancer ? "PiMermaidEnhancer" : "PiMermaidRenderer",
+        name,
         fileName: () => `mermaid-${mode}.js`,
       },
       minify: "esbuild",
