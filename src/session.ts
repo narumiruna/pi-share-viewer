@@ -326,6 +326,7 @@ window.addEventListener("message", (event: MessageEvent) => {
   ) {
     clearActivationTimer(load, data.kind);
     load.active.add(data.kind);
+    load.errors.delete(data.kind);
     updateEnhancementStatus(load);
     return;
   }

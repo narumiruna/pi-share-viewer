@@ -77,6 +77,11 @@ interface DiagramRecord {
   toolbarBrand: HTMLElement;
   fullscreenIsolation?: Array<{ element: HTMLElement; inert: boolean }>;
   fullscreenOpener?: HTMLElement;
+  fullscreenScrollLocks?: Array<{
+    element: HTMLElement;
+    overflow: string;
+    overscrollBehavior: string;
+  }>;
   view?: DiagramView;
   visible: boolean;
 }
@@ -328,13 +333,47 @@ function diagramLink(diagramId: string): string | undefined {
   return `${base}${piParameters ? `&${piParameters}` : ""}&diagramId=${diagramId}`;
 }
 
+function setFallbackScrollLock(record: DiagramRecord, active: boolean): void {
+  if (!active) {
+    for (const item of record.fullscreenScrollLocks ?? []) {
+      item.element.style.overflow = item.overflow;
+      item.element.style.overscrollBehavior = item.overscrollBehavior;
+    }
+    record.fullscreenScrollLocks = undefined;
+    return;
+  }
+  if (record.fullscreenScrollLocks) return;
+
+  const scrollContainers = new Set<HTMLElement>([
+    document.documentElement,
+    document.body,
+  ]);
+  let current = record.card.parentElement;
+  while (current) {
+    const style = getComputedStyle(current);
+    if (/(auto|scroll|overlay)/.test(`${style.overflow} ${style.overflowY}`)) {
+      scrollContainers.add(current);
+    }
+    current = current.parentElement;
+  }
+  record.fullscreenScrollLocks = [...scrollContainers].map((element) => ({
+    element,
+    overflow: element.style.overflow,
+    overscrollBehavior: element.style.overscrollBehavior,
+  }));
+  for (const item of record.fullscreenScrollLocks) {
+    item.element.style.overflow = "hidden";
+    item.element.style.overscrollBehavior = "none";
+  }
+}
+
 function setFallbackIsolation(record: DiagramRecord, active: boolean): void {
+  setFallbackScrollLock(record, active);
   if (!active) {
     for (const item of record.fullscreenIsolation ?? []) {
       item.element.inert = item.inert;
     }
     record.fullscreenIsolation = undefined;
-    document.dispatchEvent(new CustomEvent("pi-session-layout-refresh"));
     return;
   }
   if (record.fullscreenIsolation) return;

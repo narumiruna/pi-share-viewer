@@ -137,10 +137,23 @@ test("fullscreen preserves readable sizing, guidance, isolation, and focus", asy
     element.requestFullscreen = () => Promise.reject(new Error("fallback"));
   });
   const opener = card.getByRole("button", { name: "Open fullscreen to pan" });
+  const content = frame.locator("#content");
+  const contentState = await content.evaluate((element) => ({
+    overflow: element.style.overflow,
+    overscrollBehavior: element.style.overscrollBehavior,
+    scrollTop: element.scrollTop,
+  }));
   const zoom = await card.getByLabel("Current zoom").textContent();
   await opener.focus();
   await opener.click();
   await expect(card).toHaveClass(/pi-mermaid-expanded/);
+  await expect(content).toHaveCSS("overflow", "hidden");
+  await expect(content).toHaveCSS("overscroll-behavior", "none");
+  await card.hover();
+  await page.mouse.wheel(0, 500);
+  expect(await content.evaluate((element) => element.scrollTop)).toBe(
+    contentState.scrollTop,
+  );
   await expect(card.getByLabel("Current zoom")).toHaveText(zoom ?? "");
   await expect(card.locator(".pi-mermaid-pan-hint")).toContainText(
     "one finger to pan",
@@ -161,4 +174,13 @@ test("fullscreen preserves readable sizing, guidance, isolation, and focus", asy
     "inert",
     false,
   );
+  expect(
+    await content.evaluate((element) => ({
+      overflow: element.style.overflow,
+      overscrollBehavior: element.style.overscrollBehavior,
+    })),
+  ).toEqual({
+    overflow: contentState.overflow,
+    overscrollBehavior: contentState.overscrollBehavior,
+  });
 });

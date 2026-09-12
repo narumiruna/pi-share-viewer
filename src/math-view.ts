@@ -11,6 +11,7 @@ interface InstalledMathView {
 function installFormulaView(
   element: HTMLElement,
   source: string,
+  activate: (close: () => void) => () => void,
 ): InstalledMathView {
   element.dataset.piMathSource = source;
   const display = element.dataset.piMathDisplay === "true";
@@ -78,8 +79,36 @@ function installFormulaView(
 
   let copySequence = 0;
   let dismissalListenersInstalled = false;
+  let deactivate: () => void = () => undefined;
+  const positionPopover = () => {
+    if (popover.hidden) return;
+    const margin = 16;
+    const gap = 8;
+    const buttonBounds = sourceButton.getBoundingClientRect();
+    popover.style.width = `${Math.min(352, Math.max(1, window.innerWidth - margin * 2))}px`;
+    const bounds = popover.getBoundingClientRect();
+    const maxLeft = Math.max(margin, window.innerWidth - bounds.width - margin);
+    const left = Math.min(
+      Math.max(margin, buttonBounds.right - bounds.width),
+      maxLeft,
+    );
+    const above = buttonBounds.top - bounds.height - gap;
+    const below = buttonBounds.bottom + gap;
+    const preferredTop =
+      below + bounds.height <= window.innerHeight - margin || above < margin
+        ? below
+        : above;
+    const maxTop = Math.max(
+      margin,
+      window.innerHeight - bounds.height - margin,
+    );
+    popover.style.left = `${Math.round(left)}px`;
+    popover.style.top = `${Math.round(Math.min(Math.max(margin, preferredTop), maxTop))}px`;
+  };
   const onDocumentPointer = (event: PointerEvent) => {
-    if (!popover.hidden && !shell.contains(event.target as Node)) close(false);
+    if (!popover.hidden && !controls.contains(event.target as Node)) {
+      close(false);
+    }
   };
   const onDocumentKey = (event: KeyboardEvent) => {
     if (event.key !== "Escape" || popover.hidden) return;
@@ -98,17 +127,23 @@ function installFormulaView(
     dismissalListenersInstalled = true;
     document.addEventListener("pointerdown", onDocumentPointer, true);
     document.addEventListener("keydown", onDocumentKey, true);
+    document.addEventListener("scroll", positionPopover, true);
     document.addEventListener("pi-session-escape", onSessionEscape);
+    window.addEventListener("resize", positionPopover);
   };
   const removeDismissalListeners = () => {
     if (!dismissalListenersInstalled) return;
     dismissalListenersInstalled = false;
     document.removeEventListener("pointerdown", onDocumentPointer, true);
     document.removeEventListener("keydown", onDocumentKey, true);
+    document.removeEventListener("scroll", positionPopover, true);
     document.removeEventListener("pi-session-escape", onSessionEscape);
+    window.removeEventListener("resize", positionPopover);
   };
   const close = (restoreFocus: boolean) => {
     removeDismissalListeners();
+    deactivate();
+    deactivate = () => undefined;
     if (popover.hidden) return;
     popover.hidden = true;
     sourceButton.setAttribute("aria-expanded", "false");
@@ -116,9 +151,11 @@ function installFormulaView(
   };
   const open = () => {
     if (!popover.hidden) return;
+    deactivate = activate(() => close(false));
     popover.hidden = false;
     sourceButton.setAttribute("aria-expanded", "true");
     addDismissalListeners();
+    positionPopover();
     copy.focus({ preventScroll: true });
   };
   const toggle = () => {
@@ -191,12 +228,23 @@ function installFormulaView(
 }
 
 export class MathView {
+  private activeClose?: () => void;
   private installed = new WeakMap<HTMLElement, InstalledMathView>();
   private views = new Set<InstalledMathView>();
 
+  private activate(close: () => void): () => void {
+    this.activeClose?.();
+    this.activeClose = close;
+    return () => {
+      if (this.activeClose === close) this.activeClose = undefined;
+    };
+  }
+
   install(element: HTMLElement, source: string): void {
     if (this.installed.has(element)) return;
-    const view = installFormulaView(element, source);
+    const view = installFormulaView(element, source, (close) =>
+      this.activate(close),
+    );
     this.installed.set(element, view);
     this.views.add(view);
   }

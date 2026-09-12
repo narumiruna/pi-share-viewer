@@ -100,9 +100,27 @@ test("formula source controls copy exact original expressions and preserve seman
   const sourceButton = inline.getByRole("button", { name: "Formula source" });
   await sourceButton.focus();
   await sourceButton.click();
-  await expect(inline.locator(".pi-math-source-popover")).toBeVisible();
-  await expect(inline.locator(".pi-math-source-popover code")).toHaveText(
-    "$x_i$",
+  const inlinePopover = inline.locator(".pi-math-source-popover");
+  await expect(inlinePopover).toBeVisible();
+  await expect(inlinePopover.locator("code")).toHaveText("$x_i$");
+  const popoverBounds = await inlinePopover.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    return {
+      bottom: bounds.bottom,
+      left: bounds.left,
+      right: bounds.right,
+      top: bounds.top,
+      viewportHeight: window.innerHeight,
+      viewportWidth: window.innerWidth,
+    };
+  });
+  expect(popoverBounds.left).toBeGreaterThanOrEqual(15);
+  expect(popoverBounds.right).toBeLessThanOrEqual(
+    popoverBounds.viewportWidth - 15,
+  );
+  expect(popoverBounds.top).toBeGreaterThanOrEqual(15);
+  expect(popoverBounds.bottom).toBeLessThanOrEqual(
+    popoverBounds.viewportHeight - 15,
   );
   const copy = inline.getByRole("button", { name: "Copy LaTeX" });
   await copy.click();
@@ -219,18 +237,15 @@ test("linked formulas retain separate source controls", async ({ page }) => {
   await expect(sourceButtons).toHaveCount(2, { timeout: 15_000 });
   await expect(link.getByRole("button")).toHaveCount(0);
 
+  const popovers = shell.locator(".pi-math-source-popover");
   await sourceButtons.nth(0).click();
-  await expect(shell.locator(".pi-math-source-popover code").nth(0)).toHaveText(
-    "$x$",
-  );
-  await shell
-    .getByRole("button", { name: "Copy LaTeX" })
-    .nth(0)
-    .press("Escape");
+  await expect(popovers.nth(0).locator("code")).toHaveText("$x$");
+  await expect(popovers.nth(0)).toBeVisible();
+
   await sourceButtons.nth(1).click();
-  await expect(shell.locator(".pi-math-source-popover code").nth(1)).toHaveText(
-    "$y$",
-  );
+  await expect(popovers.nth(0)).toBeHidden();
+  await expect(popovers.nth(1).locator("code")).toHaveText("$y$");
+  await expect(popovers.nth(1)).toBeVisible();
 });
 
 test("formula dismissal listeners exist only while a popover is open", async ({

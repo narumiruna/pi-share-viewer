@@ -44,8 +44,7 @@ export function installMathStyle(): void {
   opacity: 1;
 }
 .pi-math-source-popover {
-  display: grid; position: absolute; z-index: 4; top: 1.4rem;
-  right: calc(var(--pi-math-control-index, 0) * 34px);
+  display: grid; position: fixed; z-index: 4; top: 0; left: 0;
   width: min(22rem, calc(100vw - 2rem)); max-height: 16rem; gap: 8px;
   overflow: auto; border: 1px solid var(--border); border-radius: 6px;
   background: var(--container-bg); color: var(--text); padding: 10px;

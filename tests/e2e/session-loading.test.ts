@@ -238,6 +238,43 @@ test("renderer initialization failure keeps retry available", async ({
   await expect(page.locator("#enhancement-status")).toBeHidden();
 });
 
+test("late runtime success clears its stale failure status", async ({
+  page,
+}) => {
+  await mockGist(page, await createReviewExportFixture());
+  await page.route("**/assets/mermaid-renderer.js", (route) =>
+    route.fulfill({
+      body: 'throw new Error("broken renderer fixture");',
+      contentType: "application/javascript",
+      status: 200,
+    }),
+  );
+  await page.goto(`/session/#${DARK_GIST_ID}`);
+  const frame = page.frameLocator("#preview");
+  await expect(
+    frame.locator('.pi-math[data-pi-math-state="rendered"]'),
+  ).toHaveCount(6, { timeout: 15_000 });
+  await expect(page.locator("#enhancement-message")).toContainText(
+    "Renderer failed to initialize",
+    { timeout: 15_000 },
+  );
+  const loadId = await frame
+    .locator('meta[name="pi-load-id"]')
+    .getAttribute("content");
+  if (!loadId) throw new Error("Session load ID is missing");
+  await frame.locator("body").evaluate((_, id) => {
+    window.parent.postMessage(
+      {
+        type: "pi-share-viewer-runtime-active",
+        loadId: id,
+        kind: "renderer",
+      },
+      "*",
+    );
+  }, loadId);
+  await expect(page.locator("#enhancement-status")).toBeHidden();
+});
+
 test("enhancer initialization failure keeps retry available", async ({
   page,
 }) => {
