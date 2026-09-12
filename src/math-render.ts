@@ -89,9 +89,13 @@ export class MathRenderer {
       )
         continue;
       this.seen.add(element);
-      if (this.budget.exhausted) {
+      const source =
+        element.dataset.piMathSource ?? (element.textContent ?? "").trim();
+      if (element.closest(".pi-math-shell")) {
+        this.mathView.install(element, source);
+      } else if (this.budget.exhausted) {
         element.dataset.piMathState = "limited";
-        this.mathView.install(element, (element.textContent ?? "").trim());
+        this.mathView.install(element, source);
       } else this.pending.push(element);
     }
     if (this.pending.length && this.timer === undefined) this.schedule();
@@ -116,9 +120,12 @@ export class MathRenderer {
       this.seen.delete(element);
       return;
     }
-    const source = (element.textContent ?? "").trim();
-    if (this.budget.exhausted) element.dataset.piMathState = "limited";
-    else renderMath(element, this.budget);
+    const source =
+      element.dataset.piMathSource ?? (element.textContent ?? "").trim();
+    if (!element.closest(".pi-math-shell")) {
+      if (this.budget.exhausted) element.dataset.piMathState = "limited";
+      else renderMath(element, this.budget);
+    }
     this.mathView.install(element, source);
   }
 

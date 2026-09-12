@@ -111,11 +111,22 @@ test("a hidden tool deep link reveals only its target", async ({ page }) => {
   await expect(target).toBeVisible();
   await expect(target).toBeFocused();
   await expect(target).toHaveAttribute("data-pi-details-open", "true");
-  await expect(frame.locator("#tool-call-tool-bash-1")).toBeHidden();
+  const secondTarget = frame.locator("#tool-call-tool-bash-1");
+  await expect(secondTarget).toBeHidden();
   await expect(frame.locator("html")).toHaveAttribute(
     "data-pi-show-tools",
     "false",
   );
+
+  await frame.locator('.tree-node[data-id="44444444"] .pi-tree-action').click();
+  await expect(target).toBeHidden();
+  await expect(secondTarget).toBeVisible();
+  await expect(secondTarget).toHaveAttribute("data-pi-revealed", "true");
+  await frame.locator('.tree-node[data-id="88888888"] .pi-tree-action').click();
+  await expect(secondTarget).toBeHidden();
+  await expect(
+    frame.locator('.tool-execution[data-pi-revealed="true"]'),
+  ).toHaveCount(0);
 });
 
 test("mobile drawer traps focus, dismisses predictably, and restores layout state", async ({

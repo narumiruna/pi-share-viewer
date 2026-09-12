@@ -158,6 +158,13 @@ test("enhancer 503 and timeout retain raw source and offer retry", async ({
   test.setTimeout(35_000);
   const html = await createReviewExportFixture();
   await mockGist(page, html);
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem("pi-share-viewer-theme", "light");
+    } catch {
+      // Sandboxed srcdoc frames have an opaque origin; the parent value is enough.
+    }
+  });
   let attempt = 0;
   await page.route("**/assets/mermaid-enhancer.js", async (route) => {
     attempt += 1;
@@ -174,6 +181,15 @@ test("enhancer 503 and timeout retain raw source and offer retry", async ({
   });
   await page.goto(`/session/#${DARK_GIST_ID}`);
   const frame = page.frameLocator("#preview");
+  await expect(frame.locator("html")).toHaveAttribute(
+    "data-pi-mermaid-theme",
+    "light",
+  );
+  expect(
+    await frame
+      .locator("html")
+      .evaluate((element) => getComputedStyle(element).colorScheme),
+  ).toBe("light");
   await expect(frame.locator(".pi-math").first()).toContainText("$x_i$");
   await expect(page.locator("#enhancement-message")).toContainText(
     "enhancement unavailable",
@@ -187,6 +203,47 @@ test("enhancer 503 and timeout retain raw source and offer retry", async ({
   await expect(
     frame.locator('.pi-math[data-pi-math-state="rendered"]'),
   ).toHaveCount(6, { timeout: 15_000 });
+});
+
+test("enhancer initialization failure keeps retry available", async ({
+  page,
+}) => {
+  await mockGist(page, await createReviewExportFixture());
+  let failEnhancer = true;
+  await page.route("**/assets/mermaid-enhancer.js", async (route) => {
+    if (failEnhancer) {
+      await route.fulfill({
+        body: 'throw new Error("broken enhancer fixture");',
+        contentType: "application/javascript",
+        status: 200,
+      });
+    } else {
+      await route.fallback();
+    }
+  });
+  await page.goto(`/session/#${DARK_GIST_ID}`);
+  const frame = page.frameLocator("#preview");
+  await expect(frame.locator(".pi-math").first()).toContainText("$x_i$");
+  await expect(page.locator("#enhancement-message")).toContainText(
+    "Enhancer failed to initialize",
+  );
+  await expect(
+    page.getByRole("button", { name: "Retry enhancements" }),
+  ).toBeVisible();
+  await frame.locator("body").evaluate((body) => {
+    body.dataset.retryIdentity = "same-frame";
+  });
+
+  failEnhancer = false;
+  await page.getByRole("button", { name: "Retry enhancements" }).click();
+  await expect(
+    frame.locator('.pi-math[data-pi-math-state="rendered"]'),
+  ).toHaveCount(6, { timeout: 15_000 });
+  await expect(frame.locator("body")).toHaveAttribute(
+    "data-retry-identity",
+    "same-frame",
+  );
+  await expect(page.locator("#enhancement-status")).toBeHidden();
 });
 
 test("transient session failures retry, terminal exports never enter the iframe", async ({

@@ -78,24 +78,37 @@ function createDisclosure(
   container.replaceWith(details);
 }
 
-function ensureToolDisclosure(tool: HTMLElement): void {
-  if (tool.dataset.piToolDisclosure === "true") return;
+function ensureToolDisclosure(
+  tool: HTMLElement,
+  boundDisclosures: WeakSet<HTMLButtonElement>,
+): void {
   tool.dataset.piToolDisclosure = "true";
-  tool.dataset.piDetailsOpen = "false";
-  const toggle = document.createElement("button");
-  toggle.type = "button";
-  toggle.className = "pi-entry-disclosure";
-  toggle.textContent = "Show tool details";
-  toggle.setAttribute("aria-expanded", "false");
-  toggle.addEventListener("click", () => {
-    const open = tool.dataset.piDetailsOpen !== "true";
-    tool.dataset.piDetailsOpen = String(open);
+  if (tool.dataset.piDetailsOpen !== "true") {
+    tool.dataset.piDetailsOpen = "false";
+  }
+  let toggle = tool.querySelector<HTMLButtonElement>(
+    ":scope > .pi-entry-disclosure",
+  );
+  if (!toggle) {
+    toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "pi-entry-disclosure";
+    const role = tool.querySelector(":scope > .pi-message-role");
+    if (role) role.after(toggle);
+    else tool.prepend(toggle);
+  }
+  const sync = () => {
+    const open = tool.dataset.piDetailsOpen === "true";
     toggle.setAttribute("aria-expanded", String(open));
     toggle.textContent = open ? "Hide tool details" : "Show tool details";
+  };
+  sync();
+  if (boundDisclosures.has(toggle)) return;
+  boundDisclosures.add(toggle);
+  toggle.addEventListener("click", () => {
+    tool.dataset.piDetailsOpen = String(tool.dataset.piDetailsOpen !== "true");
+    sync();
   });
-  const role = tool.querySelector(":scope > .pi-message-role");
-  if (role) role.after(toggle);
-  else tool.prepend(toggle);
 }
 
 export function installSessionUi(): () => void {
@@ -105,6 +118,7 @@ export function installSessionUi(): () => void {
   let showThinking = false;
   let showTools = false;
   const copySequences = new WeakMap<HTMLButtonElement, number>();
+  const boundDisclosures = new WeakSet<HTMLButtonElement>();
 
   const applyPreferences = () => {
     root.dataset.piSessionMode = mode;
@@ -214,7 +228,7 @@ export function installSessionUi(): () => void {
       ".tool-execution",
     )) {
       addRole(message, "Tool");
-      ensureToolDisclosure(message);
+      ensureToolDisclosure(message, boundDisclosures);
     }
     for (const message of document.querySelectorAll<HTMLElement>(
       ".hook-message",
@@ -247,6 +261,11 @@ export function installSessionUi(): () => void {
         : typeof detail.currentTargetId === "string"
           ? detail.currentTargetId
           : undefined;
+    for (const tool of document.querySelectorAll<HTMLElement>(
+      '.tool-execution[data-pi-revealed="true"]',
+    )) {
+      tool.removeAttribute("data-pi-revealed");
+    }
     if (!requested) return;
     const entry = entryById.get(requested);
     let target: HTMLElement | null = document.getElementById(
@@ -271,8 +290,6 @@ export function installSessionUi(): () => void {
         toggle.setAttribute("aria-expanded", "true");
       }
     }
-    for (const tool of target.querySelectorAll<HTMLElement>(".tool-execution"))
-      tool.dataset.piRevealed = "true";
   };
 
   globalThis.__PI_SESSION_COPY__ = async (text, button) => {

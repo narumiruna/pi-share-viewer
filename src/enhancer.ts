@@ -952,3 +952,11 @@ window.addEventListener(
   { once: true },
 );
 scheduleScan();
+
+const enhancerRuntime = document.currentScript;
+if (
+  enhancerRuntime instanceof HTMLScriptElement &&
+  enhancerRuntime.dataset.piEnhancerRuntime === "true"
+) {
+  enhancerRuntime.dataset.piEnhancerActive = "true";
+}

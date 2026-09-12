@@ -166,6 +166,27 @@ test("Reading and Inspect controls reflect content and survive branch renders", 
       ),
   ).toBe(5);
 
+  const firstTool = frame.locator(".tool-execution").first();
+  await firstTool
+    .getByRole("button", { name: "Show tool details", exact: true })
+    .click();
+  await expect(firstTool).toHaveAttribute("data-pi-details-open", "true");
+  await firstTool.evaluate((tool) => {
+    tool.replaceWith(tool.cloneNode(true));
+    document.dispatchEvent(
+      new CustomEvent("pi-session-render", {
+        detail: { currentTargetId: "22222222" },
+      }),
+    );
+  });
+  const clonedDisclosure = firstTool.locator(":scope > .pi-entry-disclosure");
+  await expect(clonedDisclosure).toHaveText("Hide tool details");
+  await expect(clonedDisclosure).toHaveAttribute("aria-expanded", "true");
+  await clonedDisclosure.click();
+  await expect(firstTool).toHaveAttribute("data-pi-details-open", "false");
+  await expect(clonedDisclosure).toHaveAttribute("aria-expanded", "false");
+  await expect(clonedDisclosure).toHaveText("Show tool details");
+
   await frame.getByRole("button", { name: "Reading", exact: true }).click();
   await frame
     .getByRole("button", { name: "Show thinking", exact: true })

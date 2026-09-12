@@ -13,19 +13,27 @@ function installFormulaView(
   source: string,
 ): InstalledMathView {
   element.dataset.piMathSource = source;
+  const display = element.dataset.piMathDisplay === "true";
   const existing = element.closest<HTMLElement>(".pi-math-shell");
-  if (existing) {
-    return {
-      destroy: () => undefined,
-      isConnected: () => existing.isConnected,
-      update: () => undefined,
-    };
+  const shell = existing ?? document.createElement("span");
+  shell.classList.add("pi-math-shell");
+  shell.dataset.piMathDisplay = String(display);
+
+  for (const stale of shell.querySelectorAll<HTMLElement>(
+    ":scope > .pi-math-controls, :scope > .pi-math-overflow-hint",
+  )) {
+    stale.remove();
   }
 
-  const display = element.dataset.piMathDisplay === "true";
-  const shell = document.createElement("span");
-  shell.className = "pi-math-shell";
-  shell.dataset.piMathDisplay = String(display);
+  if (!existing) {
+    const interactiveAncestor = element.closest<HTMLElement>(
+      'a[href], button, input, select, textarea, [role="button"], [role="link"]',
+    );
+    const wrapped = interactiveAncestor ?? element;
+    wrapped.replaceWith(shell);
+    shell.append(wrapped);
+  }
+
   const id = `pi-math-${++mathViewSequence}`;
   const controls = document.createElement("span");
   controls.className = "pi-math-controls";
@@ -55,26 +63,10 @@ function installFormulaView(
   overflowHint.className = "pi-math-overflow-hint";
   overflowHint.hidden = true;
   overflowHint.setAttribute("aria-hidden", "true");
-
-  element.replaceWith(shell);
-  shell.append(element, controls, overflowHint);
+  shell.append(controls, overflowHint);
 
   let copySequence = 0;
-  const close = (restoreFocus: boolean) => {
-    if (popover.hidden) return;
-    popover.hidden = true;
-    sourceButton.setAttribute("aria-expanded", "false");
-    if (restoreFocus) sourceButton.focus({ preventScroll: true });
-  };
-  const open = () => {
-    popover.hidden = false;
-    sourceButton.setAttribute("aria-expanded", "true");
-    copy.focus({ preventScroll: true });
-  };
-  const toggle = () => {
-    if (popover.hidden) open();
-    else close(true);
-  };
+  let dismissalListenersInstalled = false;
   const onDocumentPointer = (event: PointerEvent) => {
     if (!popover.hidden && !shell.contains(event.target as Node)) close(false);
   };
@@ -83,6 +75,36 @@ function installFormulaView(
     event.preventDefault();
     event.stopPropagation();
     close(true);
+  };
+  const addDismissalListeners = () => {
+    if (dismissalListenersInstalled) return;
+    dismissalListenersInstalled = true;
+    document.addEventListener("pointerdown", onDocumentPointer, true);
+    document.addEventListener("keydown", onDocumentKey, true);
+  };
+  const removeDismissalListeners = () => {
+    if (!dismissalListenersInstalled) return;
+    dismissalListenersInstalled = false;
+    document.removeEventListener("pointerdown", onDocumentPointer, true);
+    document.removeEventListener("keydown", onDocumentKey, true);
+  };
+  const close = (restoreFocus: boolean) => {
+    removeDismissalListeners();
+    if (popover.hidden) return;
+    popover.hidden = true;
+    sourceButton.setAttribute("aria-expanded", "false");
+    if (restoreFocus) sourceButton.focus({ preventScroll: true });
+  };
+  const open = () => {
+    if (!popover.hidden) return;
+    popover.hidden = false;
+    sourceButton.setAttribute("aria-expanded", "true");
+    addDismissalListeners();
+    copy.focus({ preventScroll: true });
+  };
+  const toggle = () => {
+    if (popover.hidden) open();
+    else close(true);
   };
   const onCopy = async () => {
     const sequence = ++copySequence;
@@ -129,8 +151,6 @@ function installFormulaView(
   sourceButton.addEventListener("click", toggle);
   copy.addEventListener("click", onCopy);
   element.addEventListener("scroll", update, { passive: true });
-  document.addEventListener("pointerdown", onDocumentPointer, true);
-  document.addEventListener("keydown", onDocumentKey, true);
   const resize =
     typeof ResizeObserver === "function"
       ? new ResizeObserver(update)
@@ -140,12 +160,11 @@ function installFormulaView(
 
   return {
     destroy() {
+      close(false);
       resize?.disconnect();
       sourceButton.removeEventListener("click", toggle);
       copy.removeEventListener("click", onCopy);
       element.removeEventListener("scroll", update);
-      document.removeEventListener("pointerdown", onDocumentPointer, true);
-      document.removeEventListener("keydown", onDocumentKey, true);
     },
     isConnected: () => shell.isConnected,
     update,

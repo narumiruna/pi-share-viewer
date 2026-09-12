@@ -39,6 +39,7 @@ const configuredTheme = document.querySelector<HTMLMetaElement>(
 )?.content;
 
 if (configuredTheme === "dark" || configuredTheme === "light") {
+  document.documentElement.dataset.piMermaidTheme = configuredTheme;
   Object.defineProperty(globalThis, "__PI_SHARE_VIEWER_THEME__", {
     configurable: false,
     enumerable: false,
@@ -88,15 +89,23 @@ window.addEventListener("message", (event: MessageEvent) => {
     return;
   }
   if (enhancerInstalled) return;
-  enhancerInstalled = true;
   const runtime = document.createElement("script");
   runtime.dataset.piEnhancerRuntime = "true";
   runtime.textContent = message.source;
   document.body.append(runtime);
-  window.parent.postMessage(
-    { type: "pi-share-viewer-runtime-active", loadId, kind: "enhancer" },
-    "*",
-  );
+  enhancerInstalled = runtime.dataset.piEnhancerActive === "true";
+  if (enhancerInstalled) {
+    window.parent.postMessage(
+      { type: "pi-share-viewer-runtime-active", loadId, kind: "enhancer" },
+      "*",
+    );
+  } else {
+    runtime.remove();
+    window.parent.postMessage(
+      { type: "pi-share-viewer-runtime-failed", loadId, kind: "enhancer" },
+      "*",
+    );
+  }
 });
 
 window.parent.postMessage({ type: "pi-share-viewer-ready", loadId }, "*");

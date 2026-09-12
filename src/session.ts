@@ -272,6 +272,18 @@ window.addEventListener("message", (event: MessageEvent) => {
   ) {
     load.active.add(data.kind);
     updateEnhancementStatus(load);
+    return;
+  }
+  if (
+    data?.type === "pi-share-viewer-runtime-failed" &&
+    data.loadId === load.id &&
+    data.kind === "enhancer" &&
+    Object.keys(data).every((key) => ["type", "loadId", "kind"].includes(key))
+  ) {
+    load.active.delete("enhancer");
+    load.sources.delete("enhancer");
+    load.errors.set("enhancer", new Error("Enhancer failed to initialize."));
+    updateEnhancementStatus(load);
   }
 });
 
