@@ -1,8 +1,8 @@
 import { MAX_SESSION_HTML_BYTES } from "./gist.js";
-import { prepareMathHook } from "./math-inject.js";
+import { PI_EXPORT_VERSION, prepareMathHook } from "./math-inject.js";
 import type { SiteTheme } from "./theme.js";
 
-const MAX_RUNTIME_BYTES = 8 * 1024 * 1024;
+const MAX_BOOTSTRAP_BYTES = 2 * 1024 * 1024;
 
 const CHILD_CSP = [
   "default-src 'none'",
@@ -27,12 +27,12 @@ function escapeInlineScript(source: string): string {
   return source.replace(/<\/script/gi, "<\\/script");
 }
 
-export function injectMermaidEnhancer(
+export function injectSessionViewer(
   sessionHtml: string,
-  enhancerSource: string,
-  rendererSource: string,
+  bootstrapSource: string,
   gistId: string,
   viewerBaseUrl: string,
+  loadId: string,
   theme?: SiteTheme,
   urlParams = "",
   diagramId = "",
@@ -40,14 +40,14 @@ export function injectMermaidEnhancer(
   if (byteLength(sessionHtml) > MAX_SESSION_HTML_BYTES) {
     throw new Error("Session is too large to display safely.");
   }
-  if (
-    byteLength(enhancerSource) > MAX_RUNTIME_BYTES ||
-    byteLength(rendererSource) > MAX_RUNTIME_BYTES
-  ) {
-    throw new Error("Mermaid viewer runtime is unexpectedly large.");
+  if (byteLength(bootstrapSource) > MAX_BOOTSTRAP_BYTES) {
+    throw new Error("Session bootstrap is unexpectedly large.");
   }
   if (!/^[0-9a-f]{32}$/i.test(gistId)) {
     throw new Error("Invalid Gist ID.");
+  }
+  if (!/^[a-zA-Z0-9_-]{8,100}$/.test(loadId)) {
+    throw new Error("Invalid session load identity.");
   }
   if (
     diagramId &&
@@ -75,31 +75,42 @@ export function injectMermaidEnhancer(
     throw new Error("This Gist is not a supported Pi session export.");
   }
 
+  const metadata = (name: string, content: string) => {
+    const meta = document.createElement("meta");
+    meta.name = name;
+    meta.content = content;
+    return meta;
+  };
   const policy = document.createElement("meta");
   policy.httpEquiv = "Content-Security-Policy";
   policy.content = CHILD_CSP;
+  const shareUrl = metadata(
+    "pi-share-base-url",
+    new URL(`session/#${gistId.toLowerCase()}`, baseUrl).href,
+  );
+  const deepLinkParams = metadata("pi-url-params", urlParams);
+  const diagramTarget = metadata("pi-diagram-target", diagramId);
+  const identity = metadata("pi-load-id", loadId);
+  const viewerTheme = metadata("pi-viewer-theme", theme ?? "");
 
-  const shareUrl = document.createElement("meta");
-  shareUrl.name = "pi-share-base-url";
-  shareUrl.content = new URL(`session/#${gistId.toLowerCase()}`, baseUrl).href;
-
-  const deepLinkParams = document.createElement("meta");
-  deepLinkParams.name = "pi-url-params";
-  deepLinkParams.content = urlParams;
-
-  const diagramTarget = document.createElement("meta");
-  diagramTarget.name = "pi-diagram-target";
-  diagramTarget.content = diagramId;
+  const mathApplication = prepareMathHook(document);
+  const compatibility = mathApplication
+    ? metadata("pi-math-compat", PI_EXPORT_VERSION)
+    : undefined;
 
   const runtime = document.createElement("script");
-  const rendererConfig = `Object.defineProperty(globalThis, "__PI_MERMAID_RENDERER_SOURCE__", { configurable: false, enumerable: false, writable: false, value: ${JSON.stringify(rendererSource)} });\n`;
-  const themeConfig = `Object.defineProperty(globalThis, "__PI_SHARE_VIEWER_THEME__", { configurable: false, enumerable: false, writable: false, value: ${JSON.stringify(theme)} });\n`;
-  runtime.textContent = escapeInlineScript(
-    `${rendererConfig}${themeConfig}${enhancerSource}`,
-  );
+  runtime.dataset.piSessionBootstrap = "true";
+  runtime.textContent = escapeInlineScript(bootstrapSource);
 
-  document.head.prepend(policy, shareUrl, deepLinkParams, diagramTarget);
-  const mathApplication = prepareMathHook(document);
+  document.head.prepend(
+    policy,
+    shareUrl,
+    deepLinkParams,
+    diagramTarget,
+    identity,
+    viewerTheme,
+    ...(compatibility ? [compatibility] : []),
+  );
   if (mathApplication) mathApplication.before(runtime);
   else document.body.append(runtime);
   return `<!doctype html>\n${document.documentElement.outerHTML}`;

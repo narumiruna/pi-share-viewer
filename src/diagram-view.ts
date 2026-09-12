@@ -1,8 +1,10 @@
 const MIN_SCALE = 0.25;
 const MAX_SCALE = 4;
-const MIN_VISIBLE_PX = 48;
+const MIN_READABLE_LABEL_PX = 14;
 const INLINE_MIN_HEIGHT_PX = 160;
 const INLINE_MAX_HEIGHT_PX = 672;
+
+export type DiagramCameraMode = "overview" | "readable";
 
 export interface DiagramPoint {
   x: number;
@@ -10,6 +12,7 @@ export interface DiagramPoint {
 }
 
 export interface DiagramViewState {
+  cameraMode: DiagramCameraMode;
   naturalHeight: number;
   naturalWidth: number;
   scale: number;
@@ -22,13 +25,16 @@ export interface DiagramViewController {
   destroy(): void;
   fit(allowUpscale?: boolean): void;
   getState(): Readonly<DiagramViewState>;
-  refresh(forceFit?: boolean): void;
+  refresh(forceCamera?: boolean): void;
   reset(): void;
+  setCameraMode(mode: DiagramCameraMode): void;
   zoomBy(factor: number, clientPoint?: DiagramPoint): void;
 }
 
 interface DiagramViewOptions {
   isExpanded?: () => boolean;
+  onCameraModeChange?: (mode: DiagramCameraMode) => void;
+  onCropChange?: (cropped: boolean) => void;
   onEscape?: () => boolean;
   onScaleChange?: (percentage: number) => void;
 }
@@ -74,6 +80,7 @@ export function createDiagramView(
   options: DiagramViewOptions = {},
 ): DiagramViewController {
   const state: DiagramViewState = {
+    cameraMode: "overview",
     naturalHeight: 1,
     naturalWidth: 1,
     scale: 1,
@@ -84,6 +91,9 @@ export function createDiagramView(
   const pointers = new Map<number, PointerPosition>();
   let mousePointerId: number | undefined;
   let mouseLast: DiagramPoint | undefined;
+  let touchLast: DiagramPoint | undefined;
+  let touchMoved = false;
+  let suppressNodeClick = false;
   let pinch:
     | {
         distance: number;
@@ -132,24 +142,33 @@ export function createDiagramView(
     stage.style.height = `${state.naturalHeight}px`;
   }
 
+  function padding(): {
+    bottom: number;
+    left: number;
+    right: number;
+    top: number;
+  } {
+    const style = getComputedStyle(viewport);
+    return {
+      bottom: Number.parseFloat(style.paddingBottom) || 0,
+      left: Number.parseFloat(style.paddingLeft) || 0,
+      right: Number.parseFloat(style.paddingRight) || 0,
+      top: Number.parseFloat(style.paddingTop) || 0,
+    };
+  }
+
   function updateInlineHeight(): void {
     if (expanded()) {
       viewport.style.removeProperty("height");
       return;
     }
-    const style = getComputedStyle(viewport);
-    const horizontalPadding =
-      Number.parseFloat(style.paddingLeft) +
-      Number.parseFloat(style.paddingRight);
-    const verticalPadding =
-      Number.parseFloat(style.paddingTop) +
-      Number.parseFloat(style.paddingBottom);
+    const inset = padding();
     const availableWidth = Math.max(
       1,
-      viewport.clientWidth - horizontalPadding,
+      viewport.clientWidth - inset.left - inset.right,
     );
     const naturalFit = Math.min(1, availableWidth / state.naturalWidth);
-    const desired = state.naturalHeight * naturalFit + verticalPadding;
+    const desired = state.naturalHeight * naturalFit + inset.top + inset.bottom;
     const viewportLimit = Math.max(
       INLINE_MIN_HEIGHT_PX,
       window.innerHeight * 0.75,
@@ -162,31 +181,48 @@ export function createDiagramView(
     viewport.style.height = `${Math.ceil(height)}px`;
   }
 
-  function bounds(): { height: number; width: number } {
-    return { height: viewport.clientHeight, width: viewport.clientWidth };
+  function labelFontSize(): number {
+    const diagram = svg();
+    if (!diagram) return 16;
+    const sizes = [
+      ...diagram.querySelectorAll<SVGElement>(
+        "text, foreignObject span, foreignObject p",
+      ),
+    ]
+      .map((label) => Number.parseFloat(getComputedStyle(label).fontSize))
+      .filter((size) => Number.isFinite(size) && size > 0);
+    return sizes.length ? Math.min(...sizes) : 16;
   }
 
   function constrain(): void {
-    const size = bounds();
+    const inset = padding();
     const scaledWidth = state.naturalWidth * state.scale;
     const scaledHeight = state.naturalHeight * state.scale;
+    const innerWidth = Math.max(
+      1,
+      viewport.clientWidth - inset.left - inset.right,
+    );
+    const innerHeight = Math.max(
+      1,
+      viewport.clientHeight - inset.top - inset.bottom,
+    );
 
-    if (scaledWidth <= size.width) {
-      state.x = (size.width - scaledWidth) / 2;
+    if (scaledWidth <= innerWidth) {
+      state.x = inset.left + (innerWidth - scaledWidth) / 2;
     } else {
       state.x = clamp(
         state.x,
-        MIN_VISIBLE_PX - scaledWidth,
-        size.width - MIN_VISIBLE_PX,
+        viewport.clientWidth - inset.right - scaledWidth,
+        inset.left,
       );
     }
-    if (scaledHeight <= size.height) {
-      state.y = (size.height - scaledHeight) / 2;
+    if (scaledHeight <= innerHeight) {
+      state.y = inset.top + (innerHeight - scaledHeight) / 2;
     } else {
       state.y = clamp(
         state.y,
-        MIN_VISIBLE_PX - scaledHeight,
-        size.height - MIN_VISIBLE_PX,
+        viewport.clientHeight - inset.bottom - scaledHeight,
+        inset.top,
       );
     }
   }
@@ -195,32 +231,54 @@ export function createDiagramView(
     constrain();
     stage.style.transform = `translate3d(${state.x}px, ${state.y}px, 0) scale(${state.scale})`;
     options.onScaleChange?.(Math.round(state.scale * 100));
+    const inset = padding();
+    const cropped =
+      state.naturalWidth * state.scale >
+        viewport.clientWidth - inset.left - inset.right + 1 ||
+      state.naturalHeight * state.scale >
+        viewport.clientHeight - inset.top - inset.bottom + 1;
+    viewport.dataset.piDiagramCropped = String(cropped);
+    options.onCropChange?.(cropped);
   }
 
-  function fitDiagram(allowUpscale = expanded()): void {
+  function showOverview(allowUpscale = expanded()): void {
     readNaturalSize();
     updateInlineHeight();
-    const style = getComputedStyle(viewport);
-    const horizontalPadding =
-      Number.parseFloat(style.paddingLeft) +
-      Number.parseFloat(style.paddingRight);
-    const verticalPadding =
-      Number.parseFloat(style.paddingTop) +
-      Number.parseFloat(style.paddingBottom);
+    const inset = padding();
     const scale = Math.min(
-      (viewport.clientWidth - horizontalPadding) / state.naturalWidth,
-      (viewport.clientHeight - verticalPadding) / state.naturalHeight,
+      (viewport.clientWidth - inset.left - inset.right) / state.naturalWidth,
+      (viewport.clientHeight - inset.top - inset.bottom) / state.naturalHeight,
     );
     const fitScale = allowUpscale ? scale : Math.min(1, scale);
     state.scale =
       Number.isFinite(fitScale) && fitScale > 0
         ? Math.min(fitScale, MAX_SCALE)
         : 1;
+    state.cameraMode = "overview";
     state.userModified = false;
-    constrain();
     apply();
     previousViewportWidth = viewport.clientWidth;
     previousViewportHeight = viewport.clientHeight;
+    options.onCameraModeChange?.("overview");
+  }
+
+  function showReadable(): void {
+    readNaturalSize();
+    updateInlineHeight();
+    const inset = padding();
+    state.scale = clamp(
+      Math.max(1, MIN_READABLE_LABEL_PX / labelFontSize()),
+      MIN_SCALE,
+      MAX_SCALE,
+    );
+    state.x = inset.left;
+    state.y = inset.top;
+    state.cameraMode = "readable";
+    state.userModified = false;
+    apply();
+    previousViewportWidth = viewport.clientWidth;
+    previousViewportHeight = viewport.clientHeight;
+    options.onCameraModeChange?.("readable");
   }
 
   function setScaleAt(
@@ -254,7 +312,7 @@ export function createDiagramView(
     apply();
   }
 
-  function refresh(forceFit = false): void {
+  function refresh(forceCamera = false): void {
     const oldWidth = previousViewportWidth || viewport.clientWidth;
     const oldHeight = previousViewportHeight || viewport.clientHeight;
     const worldCenter = {
@@ -263,8 +321,9 @@ export function createDiagramView(
     };
     readNaturalSize();
     updateInlineHeight();
-    if (forceFit || !state.userModified) {
-      fitDiagram();
+    if (forceCamera || !state.userModified) {
+      if (state.cameraMode === "overview") showOverview();
+      else showReadable();
       return;
     }
     state.x = viewport.clientWidth / 2 - worldCenter.x * state.scale;
@@ -274,23 +333,24 @@ export function createDiagramView(
     apply();
   }
 
-  function reset(): void {
-    fitDiagram(false);
+  function setCameraMode(mode: DiagramCameraMode): void {
+    if (mode === "overview") showOverview();
+    else showReadable();
   }
 
   function onPointerDown(event: PointerEvent): void {
-    if (
-      event.target instanceof Element &&
-      event.target.closest("[data-pi-tone]")
-    ) {
-      return;
-    }
     if (event.pointerType === "touch") {
+      if (!expanded()) return;
+      if (pointers.size === 0) suppressNodeClick = false;
       pointers.set(event.pointerId, {
         clientX: event.clientX,
         clientY: event.clientY,
       });
-      if (pointers.size === 2) {
+      viewport.setPointerCapture?.(event.pointerId);
+      touchMoved = false;
+      if (pointers.size === 1) {
+        touchLast = { x: event.clientX, y: event.clientY };
+      } else if (pointers.size === 2) {
         const [first, second] = [...pointers.values()];
         const center = viewportPoint(viewport, pointerCenter(first, second));
         pinch = {
@@ -301,21 +361,26 @@ export function createDiagramView(
             y: (center.y - state.y) / state.scale,
           },
         };
-        for (const pointerId of pointers.keys()) {
-          viewport.setPointerCapture(pointerId);
-        }
+        touchLast = undefined;
       }
+      return;
+    }
+    if (
+      event.target instanceof Element &&
+      event.target.closest("[data-pi-tone]")
+    ) {
       return;
     }
     if (event.button !== 0) return;
     mousePointerId = event.pointerId;
     mouseLast = { x: event.clientX, y: event.clientY };
-    viewport.setPointerCapture(event.pointerId);
+    viewport.setPointerCapture?.(event.pointerId);
     event.preventDefault();
   }
 
   function onPointerMove(event: PointerEvent): void {
     if (event.pointerType === "touch" && pointers.has(event.pointerId)) {
+      const previous = pointers.get(event.pointerId);
       pointers.set(event.pointerId, {
         clientX: event.clientX,
         clientY: event.clientY,
@@ -326,8 +391,19 @@ export function createDiagramView(
         const nextScale =
           pinch.scale * (pointerDistance(first, second) / pinch.distance);
         setScaleAt(nextScale, center, pinch.world);
-        event.preventDefault();
+        touchMoved = true;
+      } else if (pointers.size === 1 && touchLast) {
+        const deltaX = event.clientX - touchLast.x;
+        const deltaY = event.clientY - touchLast.y;
+        if (Math.hypot(deltaX, deltaY) > 1) {
+          panBy(deltaX, deltaY);
+          touchMoved = true;
+        }
+        touchLast = { x: event.clientX, y: event.clientY };
+      } else if (previous) {
+        touchLast = { x: event.clientX, y: event.clientY };
       }
+      event.preventDefault();
       return;
     }
     if (event.pointerId !== mousePointerId || !mouseLast) return;
@@ -337,11 +413,32 @@ export function createDiagramView(
   }
 
   function stopPointer(event: PointerEvent): void {
-    pointers.delete(event.pointerId);
-    if (pointers.size < 2) pinch = undefined;
+    if (event.pointerType === "touch") {
+      pointers.delete(event.pointerId);
+      if (event.type === "pointercancel") suppressNodeClick = false;
+      else if (touchMoved) suppressNodeClick = true;
+      if (pointers.size < 2) pinch = undefined;
+      const remaining = [...pointers.values()][0];
+      touchLast = remaining
+        ? { x: remaining.clientX, y: remaining.clientY }
+        : undefined;
+      if (!remaining) touchMoved = false;
+    }
     if (event.pointerId === mousePointerId) {
       mousePointerId = undefined;
       mouseLast = undefined;
+    }
+  }
+
+  function onClick(event: MouseEvent): void {
+    if (!suppressNodeClick) return;
+    suppressNodeClick = false;
+    if (
+      event.target instanceof Element &&
+      event.target.closest("[data-pi-tone]")
+    ) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
     }
   }
 
@@ -377,7 +474,7 @@ export function createDiagramView(
         zoomBy(0.8);
         break;
       case "0":
-        fitDiagram();
+        showOverview();
         break;
       case "Escape":
         if (options.onEscape?.()) {
@@ -395,6 +492,7 @@ export function createDiagramView(
   viewport.addEventListener("pointermove", onPointerMove, { passive: false });
   viewport.addEventListener("pointerup", stopPointer);
   viewport.addEventListener("pointercancel", stopPointer);
+  viewport.addEventListener("click", onClick, true);
   viewport.addEventListener("wheel", onWheel, { passive: false });
   viewport.addEventListener("keydown", onKeyDown);
 
@@ -407,23 +505,26 @@ export function createDiagramView(
       : undefined;
   resizeObserver?.observe(viewport);
 
-  fitDiagram();
+  showOverview();
 
   return {
     destroy() {
       cancelAnimationFrame(resizeFrame);
       resizeObserver?.disconnect();
+      pointers.clear();
       viewport.removeEventListener("pointerdown", onPointerDown);
       viewport.removeEventListener("pointermove", onPointerMove);
       viewport.removeEventListener("pointerup", stopPointer);
       viewport.removeEventListener("pointercancel", stopPointer);
+      viewport.removeEventListener("click", onClick, true);
       viewport.removeEventListener("wheel", onWheel);
       viewport.removeEventListener("keydown", onKeyDown);
     },
-    fit: fitDiagram,
+    fit: showOverview,
     getState: () => state,
     refresh,
-    reset,
+    reset: showReadable,
+    setCameraMode,
     zoomBy,
   };
 }

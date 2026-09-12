@@ -39,6 +39,14 @@ npm run test:e2e   # Playwright browser tests
 
 HTML entries are in `src/index.html` and `src/session/index.html`; static assets are in `public/`. Open `/session/#<gist-id>` to view a session locally. Production output is in `dist/`. E2E tests use a local Pi export and mocked GitHub requests, not real Gists. Chrome/Chromium is verified; Firefox and Safari are not.
 
+## Session controls
+
+- The session keeps Pi's original interaction model: **System Prompt** expands from its preview, **Available Tools** stays visible, and Pi's header, thinking, tool, search, branch, and navigation controls behave as they do on `pi.dev/session`.
+- The viewer applies a higher-contrast palette and more readable Markdown typography without replacing Pi's controls or changing which session content is visible.
+- Diagrams open fitted to the full **Overview**. Use **Use readable view** for legible label sizes; cropped diagrams remain reachable with arrow keys or fullscreen. Fullscreen supports one-finger pan and two-finger pan/zoom, while inline touch gestures continue to scroll the page. Additional source, copy, style, trace, reset, and export controls are under **More diagram actions**.
+- Formula source is available from the **Formula source** control. **Copy LaTeX** copies the original delimited expression. Wide display formulas show local scroll guidance and can be focused for keyboard scrolling.
+- The readable base session appears before optional Mermaid and KaTeX assets finish loading. If an optional asset fails, the source remains readable and **Retry enhancements** retries it without replacing the session frame or resetting the current view.
+
 ## Security and limits
 
 - Untrusted sessions run in a sandboxed iframe with network requests blocked. The parent fetches Gists through GitHub's unauthenticated API and is subject to its rate limits.

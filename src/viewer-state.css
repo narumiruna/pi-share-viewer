@@ -63,12 +63,60 @@
   overflow-wrap: anywhere;
 }
 
-.error-card a {
+.error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.error-card :is(a, button) {
   display: inline-flex;
   min-height: 2.75rem;
   align-items: center;
+}
+
+.error-card a {
   color: var(--teal-11);
   text-underline-offset: 0.25em;
+}
+
+.error-card button,
+.enhancement-status button {
+  border: 1px solid var(--slate-7);
+  border-radius: 0.4rem;
+  background: var(--slate-3);
+  color: var(--slate-12);
+  padding: 0.5rem 0.75rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+.enhancement-status {
+  display: flex;
+  position: fixed;
+  z-index: 2;
+  right: 1rem;
+  bottom: 1rem;
+  left: 1rem;
+  max-width: 46rem;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-inline: auto;
+  border: 1px solid var(--slate-7);
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  color: var(--slate-12);
+  padding: 0.65rem 0.8rem;
+  box-shadow: var(--card-shadow);
+  font-size: 0.85rem;
+}
+
+.enhancement-status[hidden],
+.enhancement-status button[hidden] {
+  display: none;
 }
 
 .preview-frame {

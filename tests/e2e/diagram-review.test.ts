@@ -14,6 +14,8 @@ test("terminal renderer errors stay terminal after scrolling away and back", asy
   await mockGist(page, await createExportFixture());
   await page.goto(`/session/#${DARK_GIST_ID}`);
   const frame = page.frameLocator("#preview");
+  const pendingFailure = frame.locator(".pi-mermaid-card").last();
+  await pendingFailure.scrollIntoViewIfNeeded();
   const failed = frame.locator(".pi-mermaid-error-card");
   await expect(failed.locator(".pi-mermaid-error")).toHaveCount(1);
   await expect(frame.locator(".pi-mermaid-renderer-frame")).toHaveCount(0);
@@ -68,7 +70,8 @@ test("promotes a newly visible queued theme refresh", async ({ page }) => {
   await page.route("**/assets/mermaid-renderer.js", (route) =>
     route.fulfill({
       contentType: "application/javascript",
-      body: `window.addEventListener("message", ({ data: request }) => {
+      body: `window.parent.postMessage({ type: "pi-mermaid-render-ready" }, "*");
+    window.addEventListener("message", ({ data: request }) => {
       setTimeout(() => parent.postMessage({ type: "pi-mermaid-render-result", requestId: request.requestId,
         diagramType: "flowchart-v2", svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100"><text>Diagram</text></svg>'
       }, "*"), request.dark ? 0 : 1500);
@@ -136,6 +139,7 @@ test("PNG export preserves explicit and wrapped label lines with real Mermaid", 
       },
     });
   });
+  await card.getByRole("button", { name: "More diagram actions" }).click();
   const downloadPromise = page.waitForEvent("download");
   await card.getByRole("button", { name: "Download PNG" }).click();
   const download = await downloadPromise;

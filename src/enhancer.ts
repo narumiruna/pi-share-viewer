@@ -1,3 +1,4 @@
+import { writeClipboard } from "./clipboard.js";
 import { installDiagramCss } from "./diagram-css.js";
 import {
   createPngExport,
@@ -22,7 +23,6 @@ import {
   type DiagramViewController,
 } from "./diagram-view.js";
 import { MathRenderer } from "./math-render.js";
-import { createMathParser, type PiMarkdownParser } from "./math-source.js";
 import { installMathStyle } from "./math-style.js";
 import {
   getMermaidLimitError,
@@ -37,7 +37,6 @@ import {
   normalizeMermaidSource,
   readSessionCodeBlocks,
 } from "./mermaid-source.js";
-import { installSessionStyle } from "./session-style.js";
 import { isDarkColor } from "./theme.js";
 
 installDiagramCss();
@@ -55,23 +54,8 @@ let isDarkTheme =
 document.documentElement.dataset.piMermaidTheme = isDarkTheme
   ? "dark"
   : "light";
-installSessionStyle();
 installMathStyle();
 const mathRenderer = new MathRenderer();
-const upstreamMarkdown = (
-  globalThis as typeof globalThis & { marked?: PiMarkdownParser }
-).marked;
-if (
-  typeof upstreamMarkdown?.parse === "function" &&
-  typeof upstreamMarkdown.parseInline === "function" &&
-  upstreamMarkdown.defaults
-) {
-  Object.defineProperty(globalThis, "__PI_MATH_PARSE__", {
-    value: createMathParser(upstreamMarkdown),
-    writable: false,
-    configurable: false,
-  });
-}
 
 interface RenderedDiagram {
   dark: boolean;
@@ -91,6 +75,13 @@ interface DiagramRecord {
   status: HTMLElement;
   toolbar: HTMLElement;
   toolbarBrand: HTMLElement;
+  fullscreenIsolation?: Array<{ element: HTMLElement; inert: boolean }>;
+  fullscreenOpener?: HTMLElement;
+  fullscreenScrollLocks?: Array<{
+    element: HTMLElement;
+    overflow: string;
+    overscrollBehavior: string;
+  }>;
   view?: DiagramView;
   visible: boolean;
 }
@@ -101,15 +92,19 @@ interface DiagramView {
   polishSupported: boolean;
   stage: HTMLElement;
   svg: SVGSVGElement;
+  fullscreenCleanup: () => void;
   toolbarControls: DiagramToolbarControls;
   viewport: HTMLElement;
 }
 
-const rendererSource = (
-  globalThis as typeof globalThis & {
-    __PI_MERMAID_RENDERER_SOURCE__?: unknown;
-  }
-).__PI_MERMAID_RENDERER_SOURCE__;
+function getRendererSource(): string | undefined {
+  const source = (
+    globalThis as typeof globalThis & {
+      __PI_MERMAID_RENDERER_SOURCE__?: unknown;
+    }
+  ).__PI_MERMAID_RENDERER_SOURCE__;
+  return typeof source === "string" ? source : undefined;
+}
 const diagramTarget =
   document
     .querySelector<HTMLMetaElement>('meta[name="pi-diagram-target"]')
@@ -125,32 +120,21 @@ let scanQueued = false;
 let themeGeneration = 0;
 let targetFocused = false;
 
+function disposeRecord(record: DiagramRecord): void {
+  if (records.get(record.card) !== record) return;
+  visibilityObserver?.unobserve(record.card);
+  records.delete(record.card);
+  renderedCount = Math.max(0, renderedCount - 1);
+  setFallbackIsolation(record, false);
+  record.view?.focusCleanup();
+  record.view?.fullscreenCleanup();
+  record.view?.controller.destroy();
+  record.view?.toolbarControls.destroy();
+}
+
 async function copyText(source: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(source);
-    return true;
-  } catch {
-    const previousFocus =
-      document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : undefined;
-    const textarea = document.createElement("textarea");
-    textarea.value = source;
-    textarea.style.position = "fixed";
-    textarea.style.opacity = "0";
-    document.body.append(textarea);
-    textarea.select();
-    try {
-      return document.execCommand("copy");
-    } catch {
-      return false;
-    } finally {
-      textarea.remove();
-      if (previousFocus?.isConnected) {
-        previousFocus.focus({ preventScroll: true });
-      }
-    }
-  }
+  await writeClipboard(source);
+  return true;
 }
 
 function escapeInlineScript(source: string): string {
@@ -162,7 +146,8 @@ function renderMermaidInSandbox(
   dark = isDarkTheme,
   signal?: AbortSignal,
 ): Promise<RenderedDiagram> {
-  if (typeof rendererSource !== "string") {
+  const rendererSource = getRendererSource();
+  if (!rendererSource) {
     return Promise.reject(
       new Error("Mermaid renderer runtime is unavailable."),
     );
@@ -263,10 +248,22 @@ function showRenderError(record: DiagramRecord, message: string): void {
   const copy = document.createElement("button");
   copy.type = "button";
   copy.textContent = "Copy source";
+  const copyStatus = document.createElement("span");
+  copyStatus.className = "pi-mermaid-error-copy-status";
+  copyStatus.setAttribute("role", "status");
+  copyStatus.setAttribute("aria-live", "polite");
+  let copySequence = 0;
   copy.addEventListener("click", async () => {
-    copy.textContent = (await copyText(record.source))
-      ? "Source copied"
-      : "Copy failed";
+    const sequence = ++copySequence;
+    copyStatus.textContent = "Copying source…";
+    try {
+      await copyText(record.source);
+      if (sequence === copySequence) copyStatus.textContent = "Source copied";
+    } catch (error) {
+      if (sequence !== copySequence) return;
+      copyStatus.textContent =
+        error instanceof Error ? error.message : "Unable to copy source.";
+    }
   });
   const details = document.createElement("details");
   const detailsSummary = document.createElement("summary");
@@ -275,13 +272,14 @@ function showRenderError(record: DiagramRecord, message: string): void {
   technical.className = "pi-mermaid-error-details";
   technical.textContent = `Unable to render Mermaid: ${message.slice(0, 500)}`;
   details.append(detailsSummary, technical);
-  panel.append(summary, copy, details);
+  panel.append(summary, copy, copyStatus, details);
   record.sourceView.before(panel);
   record.sourceView.querySelector("code")?.classList.add("hljs");
   record.sourceView.hidden = false;
   record.card.classList.remove("pi-mermaid-card");
   record.card.classList.add("pi-mermaid-error-card");
   record.card.dataset.piMermaidState = "error";
+  document.dispatchEvent(new CustomEvent("pi-session-content-layout"));
 }
 
 function parseSvg(markup: string): SVGSVGElement {
@@ -335,6 +333,80 @@ function diagramLink(diagramId: string): string | undefined {
   return `${base}${piParameters ? `&${piParameters}` : ""}&diagramId=${diagramId}`;
 }
 
+function setFallbackScrollLock(record: DiagramRecord, active: boolean): void {
+  if (!active) {
+    for (const item of record.fullscreenScrollLocks ?? []) {
+      item.element.style.overflow = item.overflow;
+      item.element.style.overscrollBehavior = item.overscrollBehavior;
+    }
+    record.fullscreenScrollLocks = undefined;
+    return;
+  }
+  if (record.fullscreenScrollLocks) return;
+
+  const scrollContainers = new Set<HTMLElement>([
+    document.documentElement,
+    document.body,
+  ]);
+  let current = record.card.parentElement;
+  while (current) {
+    const style = getComputedStyle(current);
+    if (/(auto|scroll|overlay)/.test(`${style.overflow} ${style.overflowY}`)) {
+      scrollContainers.add(current);
+    }
+    current = current.parentElement;
+  }
+  record.fullscreenScrollLocks = [...scrollContainers].map((element) => ({
+    element,
+    overflow: element.style.overflow,
+    overscrollBehavior: element.style.overscrollBehavior,
+  }));
+  for (const item of record.fullscreenScrollLocks) {
+    item.element.style.overflow = "hidden";
+    item.element.style.overscrollBehavior = "none";
+  }
+}
+
+function setFallbackIsolation(record: DiagramRecord, active: boolean): void {
+  setFallbackScrollLock(record, active);
+  if (!active) {
+    for (const item of record.fullscreenIsolation ?? []) {
+      item.element.inert = item.inert;
+    }
+    record.fullscreenIsolation = undefined;
+    return;
+  }
+  if (record.fullscreenIsolation) return;
+  const isolated: Array<{ element: HTMLElement; inert: boolean }> = [];
+  let current: HTMLElement = record.card;
+  while (current.parentElement) {
+    for (const sibling of current.parentElement.children) {
+      if (sibling === current || !(sibling instanceof HTMLElement)) continue;
+      isolated.push({ element: sibling, inert: sibling.inert });
+      sibling.inert = true;
+    }
+    current = current.parentElement;
+  }
+  record.fullscreenIsolation = isolated;
+}
+
+function restoreFullscreenFocus(record: DiagramRecord): void {
+  const opener = record.fullscreenOpener;
+  record.fullscreenOpener = undefined;
+  if (opener?.isConnected) {
+    requestAnimationFrame(() => opener.focus({ preventScroll: true }));
+  }
+}
+
+function closeFallbackFullscreen(record: DiagramRecord): boolean {
+  if (!record.card.classList.contains("pi-mermaid-expanded")) return false;
+  record.card.classList.remove("pi-mermaid-expanded");
+  setFallbackIsolation(record, false);
+  requestAnimationFrame(() => record.view?.controller.refresh());
+  restoreFullscreenFocus(record);
+  return true;
+}
+
 async function toolbarAction(
   record: DiagramRecord,
   action: DiagramToolbarAction,
@@ -349,12 +421,14 @@ async function toolbarAction(
     case "zoom-out":
       view.controller.zoomBy(0.8);
       return;
-    case "fit":
-      view.controller.fit();
-      return;
+    case "fit": {
+      const mode = active === true ? "overview" : "readable";
+      view.controller.setCameraMode(mode);
+      return mode === "overview";
+    }
     case "reset":
       view.controller.reset();
-      return;
+      return false;
     case "trace":
       record.card.classList.toggle("pi-mermaid-tracing", active === true);
       return active === true;
@@ -370,7 +444,7 @@ async function toolbarAction(
       view.viewport.hidden = !record.sourceView.hidden;
       if (!view.viewport.hidden) {
         requestAnimationFrame(() => {
-          view.controller.refresh(true);
+          view.controller.refresh();
           record.card.removeAttribute("data-pi-mermaid-needs-fit");
         });
       }
@@ -406,19 +480,38 @@ async function toolbarAction(
       return link ? copyText(link) : false;
     }
     case "fullscreen": {
+      if (
+        document.activeElement instanceof HTMLElement &&
+        document.activeElement.closest(".pi-mermaid-toolbar")
+      ) {
+        record.fullscreenOpener = document.activeElement;
+      }
       try {
         if (document.fullscreenElement === record.card) {
           await document.exitFullscreen();
-          requestAnimationFrame(() => view.controller.refresh(true));
+          requestAnimationFrame(() => view.controller.refresh());
+          restoreFullscreenFocus(record);
           return false;
         }
+        if (closeFallbackFullscreen(record)) return false;
         await record.card.requestFullscreen();
-        requestAnimationFrame(() => view.controller.refresh(true));
+        requestAnimationFrame(() => {
+          view.controller.refresh();
+          view.viewport.focus({ preventScroll: true });
+        });
         return true;
       } catch {
-        const expanded = record.card.classList.toggle("pi-mermaid-expanded");
-        requestAnimationFrame(() => view.controller.refresh(true));
-        return expanded;
+        if (record.card.classList.contains("pi-mermaid-expanded")) {
+          closeFallbackFullscreen(record);
+          return false;
+        }
+        record.card.classList.add("pi-mermaid-expanded");
+        setFallbackIsolation(record, true);
+        requestAnimationFrame(() => {
+          view.controller.refresh();
+          view.viewport.focus({ preventScroll: true });
+        });
+        return true;
       }
     }
   }
@@ -464,7 +557,7 @@ function mountRenderedDiagram(
   ensureAccessibleSvg(svg, decoration.kind, diagramNumber);
   viewport.setAttribute(
     "aria-label",
-    `Interactive ${decoration.kind} diagram. Use arrow keys to pan, plus or minus to zoom, and zero to fit.`,
+    `Interactive ${decoration.kind} diagram fitted to overview. Use arrow keys to pan, plus or minus to zoom, and zero to refit.`,
   );
   record.card.dataset.piMermaidKind = decoration.kind;
   record.card.dataset.piMermaidDisplay = record.displayMode;
@@ -474,28 +567,53 @@ function mountRenderedDiagram(
   record.sourceView.hidden = true;
   record.sourceView.before(viewport);
 
+  const panHint = document.createElement("p");
+  panHint.className = "pi-mermaid-pan-hint";
+  panHint.hidden = true;
+  viewport.after(panHint);
   let toolbarControls: DiagramToolbarControls = {
     announce: () => undefined,
+    destroy: () => undefined,
+    setCameraMode: () => undefined,
     setZoom: () => undefined,
   };
   const controller = createDiagramView(viewport, stage, {
     isExpanded: () =>
       document.fullscreenElement === record.card ||
       record.card.classList.contains("pi-mermaid-expanded"),
-    onEscape: () => {
-      if (record.card.classList.contains("pi-mermaid-expanded")) {
-        record.card.classList.remove("pi-mermaid-expanded");
-        requestAnimationFrame(() => controller.refresh(true));
-        return true;
-      }
-      return false;
+    onCameraModeChange: (mode) => {
+      record.card.dataset.piMermaidCamera = mode;
+      toolbarControls.setCameraMode(mode);
     },
+    onCropChange: (cropped) => {
+      panHint.hidden = !cropped;
+      panHint.textContent = cropped
+        ? document.fullscreenElement === record.card ||
+          record.card.classList.contains("pi-mermaid-expanded")
+          ? "Drag with one finger to pan; pinch with two fingers to pan and zoom."
+          : "Diagram cropped for readable labels. Open fullscreen to pan, or use arrow keys."
+        : "";
+    },
+    onEscape: () => closeFallbackFullscreen(record),
     onScaleChange: (percentage) => toolbarControls.setZoom(percentage),
   });
+  let nativeFullscreen = false;
+  const onFullscreenChange = () => {
+    const active = document.fullscreenElement === record.card;
+    if (active) nativeFullscreen = true;
+    else if (nativeFullscreen) {
+      nativeFullscreen = false;
+      requestAnimationFrame(() => controller.refresh());
+      restoreFullscreenFocus(record);
+    }
+  };
+  document.addEventListener("fullscreenchange", onFullscreenChange);
   const focusCleanup = installDiagramFocus(svg);
   record.view = {
     controller,
     focusCleanup,
+    fullscreenCleanup: () =>
+      document.removeEventListener("fullscreenchange", onFullscreenChange),
     polishSupported: decoration.polishSupported,
     stage,
     svg,
@@ -503,6 +621,7 @@ function mountRenderedDiagram(
     viewport,
   };
   toolbarControls = mountDiagramToolbar(record.toolbar, {
+    cameraMode: controller.getState().cameraMode,
     displayMode: record.displayMode,
     fullscreenTarget: record.card,
     onAction: (action, active) =>
@@ -519,6 +638,7 @@ function mountRenderedDiagram(
     toolbarControls.setZoom(Math.round(controller.getState().scale * 100));
   });
   focusTarget(record);
+  document.dispatchEvent(new CustomEvent("pi-session-content-layout"));
 }
 
 async function rerenderRecord(
@@ -529,6 +649,7 @@ async function rerenderRecord(
   const view = record.view;
   if (!view) return;
   const rendered = await renderMermaidInSandbox(record.source, dark, signal);
+  if (!record.card.isConnected) return;
   const nextSvg = parseSvg(rendered.svg);
   for (const attribute of [...view.svg.attributes]) {
     view.svg.removeAttribute(attribute.name);
@@ -560,6 +681,7 @@ async function rerenderRecord(
   } else {
     view.controller.refresh();
   }
+  document.dispatchEvent(new CustomEvent("pi-session-content-layout"));
 }
 
 function scheduleInitialRender(record: DiagramRecord, priority: number): void {
@@ -583,6 +705,10 @@ function scheduleInitialRender(record: DiagramRecord, priority: number): void {
     )
     .then((rendered) => {
       record.rendering = false;
+      if (!record.card.isConnected) {
+        disposeRecord(record);
+        return;
+      }
       mountRenderedDiagram(record, rendered);
       if (rendered.dark !== isDarkTheme)
         scheduleThemeRender(record, themeGeneration);
@@ -590,13 +716,24 @@ function scheduleInitialRender(record: DiagramRecord, priority: number): void {
     .catch((error) => {
       record.scheduled = false;
       record.rendering = false;
+      if (!record.card.isConnected) {
+        disposeRecord(record);
+        return;
+      }
       if (error instanceof DOMException && error.name === "AbortError") return;
-      showRenderError(
-        record,
+      const message =
         error instanceof Error
           ? error.message
-          : "Unknown Mermaid rendering error.",
-      );
+          : "Unknown Mermaid rendering error.";
+      if (/renderer runtime is unavailable/i.test(message)) {
+        record.scheduled = true;
+        record.card.dataset.piMermaidState = "waiting-runtime";
+        record.status.textContent =
+          "Diagram renderer unavailable. Source preserved while text remains readable.";
+        record.sourceView.hidden = false;
+        return;
+      }
+      showRenderError(record, message);
     });
 }
 
@@ -612,6 +749,10 @@ function scheduleThemeRender(
       priority: record.visible ? 100 : 0,
     })
     .catch((error) => {
+      if (!record.card.isConnected) {
+        disposeRecord(record);
+        return;
+      }
       if (error instanceof DOMException && error.name === "AbortError") return;
       record.card.dataset.piMermaidThemeStatus = "error";
       record.retryButton.hidden = false;
@@ -772,6 +913,9 @@ function scanEntry(entry: HTMLElement): void {
 
 function scan(): void {
   scanQueued = false;
+  for (const record of [...records.values()]) {
+    if (!record.card.isConnected) disposeRecord(record);
+  }
   mathRenderer.scan(document);
   for (const entry of document.querySelectorAll<HTMLElement>(
     '[id^="entry-"]',
@@ -816,23 +960,45 @@ themeToggle.addEventListener("click", () => {
 });
 document.body.append(themeToggle);
 
+const onRendererReady = () => {
+  for (const record of records.values()) {
+    if (record.card.dataset.piMermaidState === "waiting-runtime") {
+      record.scheduled = false;
+      record.sourceView.hidden = false;
+      scheduleInitialRender(record, record.visible ? 100 : 10);
+    } else if (record.card.dataset.piMermaidThemeStatus === "error") {
+      record.retryButton.hidden = true;
+      void scheduleThemeRender(record, themeGeneration);
+    }
+  }
+};
+document.addEventListener("pi-share-viewer-renderer-ready", onRendererReady);
+
 const mutationObserver = new MutationObserver(scheduleScan);
 mutationObserver.observe(document.body, {
   childList: true,
   subtree: true,
 });
-window.addEventListener(
-  "pagehide",
-  () => {
-    mutationObserver.disconnect();
-    mathRenderer.destroy();
-    visibilityObserver?.disconnect();
-    renderQueue.destroy();
-    for (const record of records.values()) {
-      record.view?.focusCleanup();
-      record.view?.controller.destroy();
-    }
-  },
-  { once: true },
-);
+const onPageHide = (event: PageTransitionEvent) => {
+  if (event.persisted) return;
+  window.removeEventListener("pagehide", onPageHide);
+  mutationObserver.disconnect();
+  document.removeEventListener(
+    "pi-share-viewer-renderer-ready",
+    onRendererReady,
+  );
+  mathRenderer.destroy();
+  visibilityObserver?.disconnect();
+  renderQueue.destroy();
+  for (const record of [...records.values()]) disposeRecord(record);
+};
+window.addEventListener("pagehide", onPageHide);
 scheduleScan();
+
+const enhancerRuntime = document.currentScript;
+if (
+  enhancerRuntime instanceof HTMLScriptElement &&
+  enhancerRuntime.dataset.piEnhancerRuntime === "true"
+) {
+  enhancerRuntime.dataset.piEnhancerActive = "true";
+}

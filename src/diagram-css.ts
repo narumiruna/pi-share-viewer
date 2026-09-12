@@ -17,9 +17,12 @@ const DIAGRAM_CSS = `
   --pi-diagram-edge: #6f8fa4;
   --pi-diagram-mask: #fff;
 }
-.pi-mermaid-card, .pi-mermaid-error-card { position: relative; margin: 1rem 0; overflow: hidden; border: 1px solid var(--pi-diagram-border); border-radius: .4rem; background: var(--pi-diagram-panel); color: var(--pi-diagram-text); }
+.pi-mermaid-card, .pi-mermaid-error-card { position: relative; margin: 1rem 0; border: 1px solid var(--pi-diagram-border); border-radius: .4rem; background: var(--pi-diagram-panel); color: var(--pi-diagram-text); }
+.pi-mermaid-card { overflow: visible; }
+.pi-mermaid-card:has(.pi-mermaid-secondary.is-open) { z-index: 100; }
+.pi-mermaid-error-card { overflow: hidden; }
 .pi-mermaid-card:focus-visible { outline: 2px solid #2dd4bf; outline-offset: 2px; }
-.pi-mermaid-toolbar { display: flex; position: relative; flex-wrap: wrap; align-items: center; justify-content: space-between; min-height: 2.75rem; padding: .25rem .4rem; border-bottom: 1px solid var(--pi-diagram-border); background: var(--pi-diagram-panel); }
+.pi-mermaid-toolbar { display: flex; position: relative; z-index: 5; flex-wrap: wrap; align-items: center; justify-content: space-between; min-height: 2.75rem; padding: .25rem .4rem; border-bottom: 1px solid var(--pi-diagram-border); border-radius: .4rem .4rem 0 0; background: var(--pi-diagram-panel); }
 .pi-mermaid-toolbar-brand { color: var(--pi-diagram-muted); font: 500 .7rem/1 ui-monospace, SFMono-Regular, Consolas, monospace; text-transform: capitalize; }
 .pi-mermaid-controls { display: flex; position: relative; flex-wrap: wrap; gap: .2rem; align-items: center; }
 .pi-mermaid-control-group { display: flex; gap: .1rem; align-items: center; min-width: 0; margin: 0; border: 0; padding: 0; }
@@ -85,19 +88,62 @@ const DIAGRAM_CSS = `
 .pi-session-theme-toggle[aria-busy="true"] { opacity: .65; cursor: progress; }
 .pi-session-theme-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .pi-mermaid-card:fullscreen, .pi-mermaid-card.pi-mermaid-expanded { display: flex; position: fixed; inset: 0; z-index: 2147483647; width: 100vw; height: 100vh; margin: 0; border: 0; border-radius: 0; flex-direction: column; background: var(--pi-diagram-panel); color: var(--pi-diagram-text); }
-.pi-mermaid-card:fullscreen .pi-mermaid-viewport, .pi-mermaid-card.pi-mermaid-expanded .pi-mermaid-viewport { max-height: none; height: auto; flex: 1; }
+.pi-mermaid-card:fullscreen .pi-mermaid-viewport, .pi-mermaid-card.pi-mermaid-expanded .pi-mermaid-viewport { max-height: none; height: auto; flex: 1; touch-action: none; }
+.pi-mermaid-pan-hint { margin: 0; border-top: 1px solid var(--pi-diagram-border); color: var(--pi-diagram-muted); padding: .4rem .65rem; font: 600 .68rem/1.4 ui-monospace, monospace; }
+.pi-mermaid-pan-hint[hidden] { display: none; }
 @media (prefers-reduced-motion: reduce) { .pi-mermaid-tracing .pi-mermaid-polished [data-pi-edge="true"] { animation: none; } }
 @media (pointer: coarse) { .pi-mermaid-toolbar button { width: 2.75rem; min-width: 2.75rem; height: 2.75rem; min-height: 2.75rem; } }
+/* Secondary actions use a right-aligned vertical menu instead of resizing the diagram. */
+.pi-mermaid-controls { position: static; width: min(100%, 100%); justify-content: flex-end; }
+.pi-mermaid-more { display: inline-grid !important; }
+.pi-mermaid-more[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--pi-diagram-border) 45%, transparent);
+  color: var(--pi-diagram-text); box-shadow: inset 0 0 0 1px var(--pi-diagram-border);
+}
+.pi-mermaid-secondary {
+  display: none; position: absolute; z-index: 10; top: calc(100% + .35rem); right: .4rem;
+  width: min(19rem, calc(100% - .8rem)); max-height: min(32rem, calc(100vh - 5rem));
+  overflow-y: auto; border: 1px solid var(--pi-diagram-border); border-radius: .45rem;
+  background: var(--pi-diagram-panel-soft); box-shadow: 0 14px 36px rgb(0 0 0 / 28%);
+}
+.pi-mermaid-secondary.is-open { display: block; }
+.pi-mermaid-secondary .pi-mermaid-control-group {
+  display: grid; width: 100%; gap: .1rem; margin: 0; padding: .35rem;
+}
+.pi-mermaid-secondary .pi-mermaid-control-group + .pi-mermaid-control-group {
+  border-top: 1px solid var(--pi-diagram-border);
+}
+.pi-mermaid-menu-heading {
+  width: 100%; margin: 0; padding: .35rem .45rem .25rem; color: var(--pi-diagram-muted);
+  font: 600 .68rem/1.2 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+.pi-mermaid-toolbar button.is-labeled {
+  display: flex; width: 100%; min-width: 0; height: auto; min-height: 2.5rem;
+  gap: .55rem; justify-content: flex-start; padding: .45rem .55rem;
+  text-align: left; line-height: 1.25;
+}
+.pi-mermaid-toolbar button.is-labeled span { min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.pi-mermaid-toolbar button.is-labeled .pi-mermaid-check { flex: 0 0 auto; color: #2dd4bf; }
+.pi-mermaid-live {
+  display: block; position: static; width: auto; height: auto; min-height: 0;
+  overflow: visible; border-top: 1px solid transparent; clip-path: none;
+  color: var(--pi-diagram-muted); padding: 0 .9rem;
+  font: 600 .68rem/1.4 ui-monospace, monospace; white-space: normal;
+}
+.pi-mermaid-live:not(:empty) { min-height: 2rem; border-top-color: var(--pi-diagram-border); padding-block: .5rem; }
+.pi-mermaid-card:fullscreen, .pi-mermaid-card.pi-mermaid-expanded { overflow: hidden; }
 @media (max-width: 640px) {
   .pi-mermaid-viewport { min-height: 10rem; padding: .5rem; }
   .pi-mermaid-toolbar { align-items: flex-start; }
   .pi-mermaid-controls { justify-content: flex-end; width: 100%; }
+  .pi-mermaid-toolbar > .pi-mermaid-toolbar-brand { width: 100%; }
   .pi-mermaid-control-group { flex-wrap: wrap; max-width: 100%; }
   .pi-mermaid-toolbar button { width: 2.75rem; min-width: 2.75rem; height: 2.75rem; min-height: 2.75rem; }
+  .pi-mermaid-toolbar button.is-labeled { width: 100%; min-height: 2.75rem; }
   .pi-mermaid-group-label { display: none; }
-  .pi-mermaid-more { display: inline-grid !important; }
-  .pi-mermaid-secondary { display: none; order: 1; flex-basis: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; flex-wrap: wrap; gap: .35rem; margin-top: .35rem; border: 1px solid var(--pi-diagram-border); border-radius: .35rem; background: var(--pi-diagram-panel-soft); padding: .35rem; }
-  .pi-mermaid-secondary.is-open { display: flex; }
+}
+@media (pointer: coarse) {
+  .pi-mermaid-secondary .pi-mermaid-control { min-height: 2.75rem; }
 }
 `;
 

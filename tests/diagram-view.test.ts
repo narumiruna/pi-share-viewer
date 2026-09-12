@@ -58,12 +58,23 @@ describe("diagram view", () => {
     view.destroy();
   });
 
-  test("fits an oversized diagram without upscaling it", () => {
+  test("starts an oversized diagram fitted to overview", () => {
     const { stage, viewport } = makeView(400, 200, 800, 200);
     const view = createDiagramView(viewport, stage);
 
-    expect(view.getState().scale).toBe(0.5);
-    expect(view.getState().x).toBe(0);
+    expect(view.getState()).toMatchObject({
+      cameraMode: "overview",
+      scale: 0.5,
+      x: 0,
+    });
+    expect(viewport.dataset.piDiagramCropped).toBe("false");
+    view.setCameraMode("readable");
+    expect(view.getState()).toMatchObject({
+      cameraMode: "readable",
+      scale: 1,
+      x: 0,
+    });
+    expect(viewport.dataset.piDiagramCropped).toBe("true");
     view.destroy();
   });
 
@@ -132,6 +143,45 @@ describe("diagram view", () => {
     viewport.dispatchEvent(zoom);
     expect(zoom.defaultPrevented).toBe(true);
     expect(view.getState().scale).toBeCloseTo(1.1);
+    view.destroy();
+  });
+
+  test("does not suppress a tap after a cancelled touch gesture", () => {
+    const { stage, viewport } = makeView();
+    const node = stage
+      .querySelector("svg")
+      ?.appendChild(
+        document.createElementNS("http://www.w3.org/2000/svg", "g"),
+      );
+    if (!node) throw new Error("Diagram node fixture failed");
+    node.dataset.piTone = "accent";
+    const touch = (type: string, x: number, y: number) => {
+      const event = new MouseEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        clientX: x,
+        clientY: y,
+      });
+      Object.defineProperties(event, {
+        pointerId: { value: 1 },
+        pointerType: { value: "touch" },
+      });
+      return event;
+    };
+    const activated = vi.fn();
+    node.addEventListener("click", activated);
+    const view = createDiagramView(viewport, stage, {
+      isExpanded: () => true,
+    });
+
+    node.dispatchEvent(touch("pointerdown", 100, 100));
+    node.dispatchEvent(touch("pointermove", 130, 100));
+    node.dispatchEvent(touch("pointercancel", 130, 100));
+    const tap = new MouseEvent("click", { bubbles: true, cancelable: true });
+    node.dispatchEvent(tap);
+
+    expect(tap.defaultPrevented).toBe(false);
+    expect(activated).toHaveBeenCalledOnce();
     view.destroy();
   });
 

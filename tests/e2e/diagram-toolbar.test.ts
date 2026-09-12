@@ -7,9 +7,8 @@ import {
   replaceSessionText,
 } from "./session-fixture.js";
 
-const viewControls = ["Zoom out", "Current zoom", "Zoom in", "Fit diagram"];
 const secondaryControls = [
-  "Reset view",
+  "Reset to readable view",
   "Use original style",
   "Trace edges",
   "Show source",
@@ -21,7 +20,7 @@ const secondaryControls = [
 ];
 
 for (const width of [320, 640, 1440]) {
-  test(`groups diagram controls in reading order at ${width}px`, async ({
+  test(`keeps a small primary toolbar and labeled secondary actions at ${width}px`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height: 900 });
@@ -33,132 +32,103 @@ for (const width of [320, 640, 1440]) {
       '.pi-mermaid-card[data-pi-mermaid-state="rendered"]',
     );
     const toolbar = card.getByRole("toolbar");
-    const visibleLabels = () =>
-      toolbar
-        .locator("button:visible, output:visible")
-        .evaluateAll((controls) =>
-          controls.map((control) => control.getAttribute("aria-label")),
-        );
+    for (const name of [
+      "Zoom out",
+      "Zoom in",
+      "Use readable view",
+      "Open fullscreen to pan",
+      "More diagram actions",
+    ]) {
+      await expect(
+        toolbar.getByRole("button", { name, exact: true }),
+      ).toBeVisible();
+    }
     const more = toolbar.getByRole("button", { name: "More diagram actions" });
+    const cardHeight = await card.evaluate((element) => element.clientHeight);
+    await expect(more).toHaveAttribute("aria-expanded", "false");
+    await more.click();
+    await expect(more).toHaveAttribute("aria-expanded", "true");
+    const secondary = toolbar.locator(".pi-mermaid-secondary");
+    await expect(secondary.locator("legend")).toHaveText([
+      "View",
+      "Copy",
+      "Download",
+    ]);
+    await expect(
+      secondary
+        .getByRole("button", { name: "Use original style", exact: true })
+        .locator(".pi-mermaid-check"),
+    ).toBeVisible();
+    await expect(
+      secondary
+        .getByRole("button", { name: "Trace edges", exact: true })
+        .locator(".pi-mermaid-check"),
+    ).toHaveCount(0);
+    for (const name of secondaryControls) {
+      const button = secondary.getByRole("button", { name, exact: true });
+      await expect(button).toBeVisible();
+      await expect(button.locator("span")).toHaveText(name);
+      await button.click({ trial: true });
+    }
+    const bounds = await secondary.boundingBox();
+    const cardBounds = await card.boundingBox();
+    if (!bounds || !cardBounds) throw new Error("Secondary actions missing");
+    expect(bounds.x).toBeGreaterThanOrEqual(cardBounds.x - 1);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(
+      cardBounds.x + cardBounds.width + 1,
+    );
+    expect(bounds.y).toBeGreaterThanOrEqual(cardBounds.y);
+    expect(await card.evaluate((element) => element.clientHeight)).toBe(
+      cardHeight,
+    );
+    const rowPositions = await secondary
+      .locator("button:visible")
+      .evaluateAll((buttons) =>
+        buttons.map((button) => button.getBoundingClientRect().top),
+      );
+    expect(rowPositions).toEqual([...rowPositions].sort((a, b) => a - b));
+    expect(new Set(rowPositions).size).toBe(rowPositions.length);
 
-    if (width > 640) {
-      await expect
-        .poll(visibleLabels)
-        .toEqual([...viewControls, ...secondaryControls, "Open fullscreen"]);
-      await expect(more).toBeHidden();
-      for (const [name, labels] of [
-        ["Diagram presentation", ["Use original style", "Trace edges"]],
-        ["Diagram source", ["Show source", "Copy source"]],
-        ["Diagram sharing and export", secondaryControls.slice(5)],
-      ] as const) {
-        const group = toolbar.getByRole("group", { name, exact: true });
-        await expect
-          .poll(() =>
-            group
-              .locator("button")
-              .evaluateAll((buttons) =>
-                buttons.map((button) => button.getAttribute("aria-label")),
-              ),
-          )
-          .toEqual(labels);
-      }
-      const boxes = await toolbar
-        .locator("button:visible, output:visible")
-        .evaluateAll((controls) =>
-          controls.map((control) => {
-            const { x, y } = control.getBoundingClientRect();
-            return { x, y };
+    if (width <= 640) {
+      const sizes = await toolbar
+        .locator("button:visible")
+        .evaluateAll((buttons) =>
+          buttons.map((button) => {
+            const rect = button.getBoundingClientRect();
+            return { height: rect.height, width: rect.width };
           }),
         );
-      for (let index = 1; index < boxes.length; index += 1) {
-        expect(boxes[index].x).toBeGreaterThan(boxes[index - 1].x);
-      }
-      await toolbar
-        .getByRole("button", { name: "Fit diagram", exact: true })
-        .focus();
-      for (const name of [...secondaryControls, "Open fullscreen"]) {
-        await page.keyboard.press("ArrowRight");
-        await expect(
-          toolbar.getByRole("button", { name, exact: true }),
-        ).toBeFocused();
-      }
-    } else {
-      await expect
-        .poll(visibleLabels)
-        .toEqual([...viewControls, "Open fullscreen", "More diagram actions"]);
-      await expect(more).toHaveAttribute("aria-expanded", "false");
-      await more.click();
-      await expect(more).toHaveAttribute("aria-expanded", "true");
-      const secondary = toolbar.locator(".pi-mermaid-secondary");
-      await expect
-        .poll(() =>
-          secondary
-            .locator("button:visible")
-            .evaluateAll((buttons) =>
-              buttons.map((button) => button.getAttribute("aria-label")),
-            ),
-        )
-        .toEqual(secondaryControls);
-      const bounds = await secondary.boundingBox();
-      expect(bounds).not.toBeNull();
-      if (!bounds) throw new Error("More actions are not visible");
-      expect(bounds.x).toBeGreaterThanOrEqual(0);
-      expect(bounds.x + bounds.width).toBeLessThanOrEqual(width);
-      const cardBounds = await card.boundingBox();
-      if (!cardBounds) throw new Error("Diagram card is not visible");
-      expect(bounds.y + bounds.height).toBeLessThanOrEqual(
-        cardBounds.y + cardBounds.height,
-      );
-      for (const name of secondaryControls) {
-        await secondary
-          .getByRole("button", { name, exact: true })
-          .click({ trial: true });
-      }
-      await card.screenshot({
-        path: `test-results/diagram-toolbar-more-${width}.png`,
-      });
-      await toolbar.getByRole("button", { name: "Trace edges" }).click();
-      await expect(card).toHaveClass(/pi-mermaid-tracing/);
-      const initialZoom = await toolbar
-        .getByLabel("Current zoom")
-        .textContent();
-      await toolbar
-        .getByRole("button", { name: "Zoom in", exact: true })
-        .click();
-      await toolbar
-        .getByRole("button", { name: "Reset view", exact: true })
-        .click();
-      await expect(toolbar.getByLabel("Current zoom")).toHaveText(
-        initialZoom ?? "",
-      );
-      await more.click();
-      await expect(secondary).toBeHidden();
-
-      // Enter the disclosure without a pointer, then traverse every action.
-      await more.focus();
-      await page.keyboard.press("Enter");
-      for (const [index, name] of secondaryControls.entries()) {
-        if (index > 0) await page.keyboard.press("ArrowRight");
-        await expect(
-          secondary.getByRole("button", { name, exact: true }),
-        ).toBeFocused();
-      }
-      await page.keyboard.press("Escape");
-      await expect(secondary).toBeHidden();
-      await expect(more).toBeFocused();
-      await expect(more).toHaveAttribute("aria-expanded", "false");
-      await page.keyboard.press("Space");
-      await expect(
-        secondary.getByRole("button", { name: "Reset view", exact: true }),
-      ).toBeFocused();
-      await page.keyboard.press("Tab");
-      await expect(card.locator(".pi-mermaid-viewport")).toBeFocused();
+      expect(
+        sizes.filter((size) => size.height < 44 || size.width < 44),
+      ).toEqual([]);
     }
+
+    await page.keyboard.press("Escape");
+    await expect(secondary).toBeHidden();
+    await expect(more).toBeFocused();
+    await more.click();
+    await card.locator(".pi-mermaid-toolbar-brand").click();
+    await expect(secondary).toBeHidden();
+    await expect(more).toBeFocused();
+    await more.click();
+    await expect(secondary).toBeVisible();
+    const sessionControl = frame.getByRole("button", {
+      name: "Toggle thinking",
+      exact: true,
+    });
+    await sessionControl.click();
+    await expect(sessionControl).toBeFocused();
+    await expect(secondary).toBeHidden();
+    await expect(more).toHaveAttribute("aria-expanded", "false");
+    await more.click();
+    await card.screenshot({
+      path: `test-results/diagram-toolbar-more-${width}.png`,
+    });
   });
 }
 
 for (const depth of [3, 4]) {
-  test(`keeps all actions reachable inside ${depth} nested block quotes`, async ({
+  test(`keeps labeled actions reachable inside ${depth} nested block quotes`, async ({
     page,
   }) => {
     await page.setViewportSize({ width: 320, height: 900 });
@@ -178,46 +148,71 @@ for (const depth of [3, 4]) {
     const card = frame.locator(
       '.pi-mermaid-card[data-pi-mermaid-state="rendered"]',
     );
-    expect(await card.evaluate((element) => element.clientWidth)).toBeLessThan(
-      190,
-    );
     const toolbar = card.getByRole("toolbar");
     await toolbar.getByRole("button", { name: "More diagram actions" }).click();
     const overflow = await toolbar.evaluate((element) => {
       const card = element.closest(".pi-mermaid-card");
       if (!card) throw new Error("Missing diagram card");
       const bounds = card.getBoundingClientRect();
-      return Array.from(element.querySelectorAll("button, output"))
+      return [...element.querySelectorAll<HTMLElement>("button:enabled")]
         .filter((control) => {
           const rect = control.getBoundingClientRect();
           return (
             rect.width > 0 &&
-            (rect.left < bounds.left ||
-              rect.right > bounds.right ||
-              rect.bottom > bounds.bottom)
+            (rect.left < bounds.left - 1 || rect.right > bounds.right + 1)
           );
         })
         .map((control) => control.getAttribute("aria-label"));
     });
     expect(overflow).toEqual([]);
-    for (const name of [
-      ...viewControls.filter((name) => name !== "Current zoom"),
-      ...secondaryControls,
-      "Open fullscreen",
-    ]) {
+    for (const name of secondaryControls) {
       await toolbar
         .getByRole("button", { name, exact: true })
         .click({ trial: true });
     }
-    await card.screenshot({
+    await toolbar.screenshot({
       path: `test-results/diagram-toolbar-nested-${depth}.png`,
     });
-    await toolbar
-      .getByRole("button", { name: "Show source", exact: true })
-      .click();
-    await expect(card.locator(".pi-mermaid-source")).toBeVisible();
-    await toolbar
-      .getByRole("button", { name: "Download PNG", exact: true })
-      .click({ trial: true });
   });
 }
+
+test("More actions remain reachable in fallback fullscreen", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await mockGist(page, await createExportFixture());
+  await page.goto(`/session/#${DARK_GIST_ID}`);
+  const frame = page.frameLocator("#preview");
+  await renderEntryDiagrams(frame, 1);
+  const card = frame.locator("#a1b2c3d4-diagram-1");
+  await card.evaluate((element) => {
+    element.requestFullscreen = () => Promise.reject(new Error("fallback"));
+  });
+  await card.getByRole("button", { name: "Open fullscreen to pan" }).click();
+  await expect(card).toHaveClass(/pi-mermaid-expanded/);
+  const sidebar = frame.locator("#sidebar");
+  const more = card.getByRole("button", { name: "More diagram actions" });
+  await more.click();
+  for (const name of secondaryControls) {
+    await card
+      .getByRole("button", { name, exact: true })
+      .click({ trial: true });
+  }
+  await more.press("Escape");
+  await page.setViewportSize({ width: 1000, height: 800 });
+  await card.getByRole("button", { name: "Zoom in" }).focus();
+  await card.getByRole("button", { name: "Zoom in" }).press("Escape");
+  await expect(card).not.toHaveClass(/pi-mermaid-expanded/);
+  await expect(sidebar).toHaveJSProperty("inert", false);
+
+  await card.getByRole("button", { name: "Open fullscreen to pan" }).click();
+  await expect(card).toHaveClass(/pi-mermaid-expanded/);
+  await page.setViewportSize({ width: 390, height: 800 });
+  await card.getByRole("button", { name: "Zoom out" }).focus();
+  await card.getByRole("button", { name: "Zoom out" }).press("Escape");
+  await expect(card).not.toHaveClass(/pi-mermaid-expanded/);
+  await expect(sidebar).toHaveJSProperty("inert", false);
+  await page.screenshot({
+    path: "test-results/diagram-toolbar-fullscreen.png",
+  });
+});

@@ -22,12 +22,14 @@ import * as Tooltip from "@radix-ui/react-tooltip";
 import {
   type ComponentType,
   createElement,
+  useCallback,
   useEffect,
   useRef,
   useState,
 } from "react";
 import { createRoot } from "react-dom/client";
 import type { DiagramDisplayMode } from "./diagram-style.js";
+import type { DiagramCameraMode } from "./diagram-view.js";
 
 export type DiagramToolbarAction =
   | "copy-link"
@@ -45,6 +47,7 @@ export type DiagramToolbarAction =
   | "zoom-out";
 
 interface DiagramToolbarProps {
+  cameraMode: DiagramCameraMode;
   displayMode: DiagramDisplayMode;
   fullscreenTarget: HTMLElement;
   onAction: (
@@ -60,12 +63,22 @@ interface ControlProps {
   disabled?: boolean;
   icon: ComponentType;
   label: string;
-  onAction: DiagramToolbarProps["onAction"];
+  labeled?: boolean;
+  onAction: (action: DiagramToolbarAction) => unknown | Promise<unknown>;
+  onError: (error: unknown) => void;
 }
 
 export interface DiagramToolbarControls {
   announce(message: string): void;
+  destroy(): void;
+  setCameraMode(mode: DiagramCameraMode): void;
   setZoom(percentage: number): void;
+}
+
+function messageFor(error: unknown): string {
+  return error instanceof Error && error.message.trim()
+    ? error.message
+    : "Diagram action failed.";
 }
 
 function Control({
@@ -73,20 +86,27 @@ function Control({
   disabled = false,
   icon: Icon,
   label,
+  labeled = false,
   onAction,
+  onError,
 }: ControlProps) {
+  const button = (
+    <Toolbar.Button
+      aria-label={label}
+      className={`pi-mermaid-control${labeled ? " is-labeled" : ""}`}
+      disabled={disabled}
+      onClick={() => {
+        void Promise.resolve(onAction(action)).catch(onError);
+      }}
+    >
+      <Icon />
+      {labeled ? <span>{label}</span> : null}
+    </Toolbar.Button>
+  );
+  if (labeled) return button;
   return (
     <Tooltip.Root>
-      <Tooltip.Trigger asChild>
-        <Toolbar.Button
-          aria-label={label}
-          className="pi-mermaid-control"
-          disabled={disabled}
-          onClick={() => void onAction(action)}
-        >
-          <Icon />
-        </Toolbar.Button>
-      </Tooltip.Trigger>
+      <Tooltip.Trigger asChild>{button}</Tooltip.Trigger>
       <Tooltip.Portal>
         <Tooltip.Content
           className="pi-mermaid-tooltip"
@@ -101,6 +121,7 @@ function Control({
 }
 
 function DiagramToolbar({
+  cameraMode,
   displayMode,
   fullscreenTarget,
   onAction,
@@ -112,10 +133,18 @@ function DiagramToolbar({
   const [tracing, setTracing] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [overview, setOverview] = useState(cameraMode === "overview");
   const [zoom, setZoom] = useState(100);
   const [status, setStatus] = useState("");
+  const feedbackSequence = useRef(0);
+  const toolbarRef = useRef<HTMLDivElement>(null);
   const secondaryRef = useRef<HTMLDivElement>(null);
   const moreRef = useRef<HTMLButtonElement>(null);
+
+  const announce = useCallback((message: string) => {
+    feedbackSequence.current += 1;
+    setStatus(message);
+  }, []);
 
   useEffect(() => {
     if (moreOpen) {
@@ -126,8 +155,33 @@ function DiagramToolbar({
   }, [moreOpen]);
 
   useEffect(() => {
-    register({ announce: setStatus, setZoom });
-  }, [register]);
+    register({
+      announce,
+      destroy: () => undefined,
+      setCameraMode: (mode) => setOverview(mode === "overview"),
+      setZoom,
+    });
+  }, [announce, register]);
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    const outside = (event: PointerEvent) => {
+      if (toolbarRef.current?.contains(event.target as Node)) return;
+      const interactive =
+        event.target instanceof Element &&
+        event.target.closest(
+          'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        );
+      setMoreOpen(false);
+      if (!interactive) {
+        requestAnimationFrame(() =>
+          moreRef.current?.focus({ preventScroll: true }),
+        );
+      }
+    };
+    document.addEventListener("pointerdown", outside, true);
+    return () => document.removeEventListener("pointerdown", outside, true);
+  }, [moreOpen]);
 
   useEffect(() => {
     const syncFullscreenState = () => {
@@ -150,45 +204,79 @@ function DiagramToolbar({
   }, [fullscreenTarget]);
 
   async function toggleSource(): Promise<void> {
-    const visible = await onAction("source");
-    if (typeof visible === "boolean") setSourceVisible(visible);
+    try {
+      const visible = await onAction("source");
+      if (typeof visible === "boolean") setSourceVisible(visible);
+    } catch (error) {
+      announce(messageFor(error));
+    }
   }
 
-  async function toggleFullscreen(): Promise<boolean | undefined> {
-    const isExpanded = await onAction("fullscreen");
-    if (typeof isExpanded === "boolean") setExpanded(isExpanded);
-    return isExpanded;
+  async function toggleFullscreen(): Promise<void> {
+    try {
+      const isExpanded = await onAction("fullscreen");
+      if (typeof isExpanded === "boolean") setExpanded(isExpanded);
+    } catch (error) {
+      announce(messageFor(error));
+    }
+  }
+
+  async function toggleCamera(): Promise<void> {
+    try {
+      const isOverview = await onAction("fit", !overview);
+      if (typeof isOverview === "boolean") setOverview(isOverview);
+    } catch (error) {
+      announce(messageFor(error));
+    }
+  }
+
+  async function resetCamera(): Promise<void> {
+    try {
+      await onAction("reset");
+      setOverview(false);
+    } catch (error) {
+      announce(messageFor(error));
+    }
   }
 
   async function runFeedback(
     action: DiagramToolbarAction,
     successMessage: string,
-  ): Promise<boolean | undefined> {
+  ): Promise<void> {
+    const sequence = ++feedbackSequence.current;
     setStatus("Working…");
-    const succeeded = await onAction(action);
-    if (succeeded === true) {
-      setStatus(successMessage);
-    } else if (succeeded === false) {
-      setStatus("Diagram action failed");
+    try {
+      const succeeded = await onAction(action);
+      if (sequence !== feedbackSequence.current) return;
+      if (succeeded === true) setStatus(successMessage);
+      else if (succeeded === false) setStatus("Diagram action failed.");
+    } catch (error) {
+      if (sequence !== feedbackSequence.current) return;
+      setStatus(messageFor(error));
     }
-    return succeeded;
   }
+
+  const onError = (error: unknown) => announce(messageFor(error));
 
   return (
     <Tooltip.Provider delayDuration={350} skipDelayDuration={150}>
       <Toolbar.Root
+        ref={toolbarRef}
         aria-label="Diagram controls"
         className="pi-mermaid-controls"
         onKeyDown={(event) => {
-          if (
-            event.key === "Escape" &&
-            moreOpen &&
-            moreRef.current?.getClientRects().length
+          if (event.key !== "Escape") return;
+          if (moreOpen) {
+            event.preventDefault();
+            event.nativeEvent.stopImmediatePropagation();
+            setMoreOpen(false);
+            moreRef.current?.focus();
+          } else if (
+            fullscreenTarget.classList.contains("pi-mermaid-expanded")
           ) {
             event.preventDefault();
-            event.stopPropagation();
-            setMoreOpen(false);
-            moreRef.current.focus();
+            event.nativeEvent.stopImmediatePropagation();
+            void toggleFullscreen();
           }
         }}
       >
@@ -201,6 +289,7 @@ function DiagramToolbar({
             icon={MinusIcon}
             label="Zoom out"
             onAction={onAction}
+            onError={onError}
           />
           <output aria-label="Current zoom" className="pi-mermaid-zoom">
             {zoom}%
@@ -210,174 +299,24 @@ function DiagramToolbar({
             icon={PlusIcon}
             label="Zoom in"
             onAction={onAction}
+            onError={onError}
           />
-          <Control
-            action="fit"
-            icon={CornersIcon}
-            label="Fit diagram"
-            onAction={onAction}
-          />
+          <Toolbar.Button
+            aria-label={overview ? "Use readable view" : "Show overview"}
+            aria-pressed={overview}
+            className="pi-mermaid-control"
+            onClick={() => void toggleCamera()}
+          >
+            <CornersIcon />
+          </Toolbar.Button>
         </fieldset>
-
-        <div
-          ref={secondaryRef}
-          id={`${fullscreenTarget.id}-actions`}
-          className={`pi-mermaid-secondary${moreOpen ? " is-open" : ""}`}
+        <Toolbar.Button
+          aria-label={expanded ? "Close fullscreen" : "Open fullscreen to pan"}
+          className="pi-mermaid-control"
+          onClick={() => void toggleFullscreen()}
         >
-          <fieldset
-            aria-label="Reset diagram view"
-            className="pi-mermaid-control-group"
-          >
-            <Control
-              action="reset"
-              icon={ResetIcon}
-              label="Reset view"
-              onAction={onAction}
-            />
-          </fieldset>
-          <Toolbar.Separator className="pi-mermaid-group-label" decorative>
-            Presentation
-          </Toolbar.Separator>
-          <fieldset
-            aria-label="Diagram presentation"
-            className="pi-mermaid-control-group"
-          >
-            {polishSupported ? (
-              <Tooltip.Root>
-                <Tooltip.Trigger asChild>
-                  <Toolbar.Button asChild>
-                    <Toggle.Root
-                      aria-label={
-                        polished ? "Use original style" : "Use polished style"
-                      }
-                      className="pi-mermaid-control"
-                      onPressedChange={async (pressed) => {
-                        const active = await onAction("display-mode", pressed);
-                        if (typeof active === "boolean") setPolished(active);
-                      }}
-                      pressed={polished}
-                    >
-                      <MixerHorizontalIcon />
-                    </Toggle.Root>
-                  </Toolbar.Button>
-                </Tooltip.Trigger>
-                <Tooltip.Portal>
-                  <Tooltip.Content
-                    className="pi-mermaid-tooltip"
-                    side="bottom"
-                    sideOffset={7}
-                  >
-                    {polished ? "Use original style" : "Use polished style"}
-                  </Tooltip.Content>
-                </Tooltip.Portal>
-              </Tooltip.Root>
-            ) : null}
-            <Tooltip.Root>
-              <Tooltip.Trigger asChild>
-                <Toolbar.Button asChild disabled={!polishSupported}>
-                  <Toggle.Root
-                    aria-label="Trace edges"
-                    className="pi-mermaid-control"
-                    disabled={!polishSupported}
-                    onPressedChange={(pressed) => {
-                      setTracing(pressed);
-                      void onAction("trace", pressed);
-                    }}
-                    pressed={tracing}
-                  >
-                    <ActivityLogIcon />
-                  </Toggle.Root>
-                </Toolbar.Button>
-              </Tooltip.Trigger>
-              <Tooltip.Portal>
-                <Tooltip.Content
-                  className="pi-mermaid-tooltip"
-                  side="bottom"
-                  sideOffset={7}
-                >
-                  Trace edges
-                </Tooltip.Content>
-              </Tooltip.Portal>
-            </Tooltip.Root>
-          </fieldset>
-          <Toolbar.Separator className="pi-mermaid-group-label" decorative>
-            Source
-          </Toolbar.Separator>
-          <fieldset
-            aria-label="Diagram source"
-            className="pi-mermaid-control-group"
-          >
-            <Tooltip.Root>
-              <Tooltip.Trigger asChild>
-                <Toolbar.Button
-                  aria-controls={`${fullscreenTarget.id}-source`}
-                  aria-label={sourceVisible ? "Show diagram" : "Show source"}
-                  aria-pressed={sourceVisible}
-                  className="pi-mermaid-control"
-                  onClick={() => void toggleSource()}
-                >
-                  {sourceVisible ? <EyeOpenIcon /> : <CodeIcon />}
-                </Toolbar.Button>
-              </Tooltip.Trigger>
-              <Tooltip.Portal>
-                <Tooltip.Content
-                  className="pi-mermaid-tooltip"
-                  side="bottom"
-                  sideOffset={7}
-                >
-                  {sourceVisible ? "Show diagram" : "Show source"}
-                </Tooltip.Content>
-              </Tooltip.Portal>
-            </Tooltip.Root>
-            <Control
-              action="copy-source"
-              icon={CopyIcon}
-              label="Copy source"
-              onAction={() => runFeedback("copy-source", "Source copied")}
-            />
-          </fieldset>
-          <Toolbar.Separator className="pi-mermaid-group-label" decorative>
-            Share and export
-          </Toolbar.Separator>
-          <fieldset
-            aria-label="Diagram sharing and export"
-            className="pi-mermaid-control-group"
-          >
-            <Control
-              action="copy-link"
-              icon={Link2Icon}
-              label="Copy diagram link"
-              onAction={() => runFeedback("copy-link", "Diagram link copied")}
-            />
-            <Control
-              action="copy-svg"
-              icon={CheckIcon}
-              label="Copy SVG"
-              onAction={() => runFeedback("copy-svg", "SVG copied")}
-            />
-            <Control
-              action="download-svg"
-              icon={DownloadIcon}
-              label="Download SVG"
-              onAction={() => runFeedback("download-svg", "SVG downloaded")}
-            />
-            <Control
-              action="download-png"
-              icon={ImageIcon}
-              label="Download PNG"
-              onAction={() => runFeedback("download-png", "PNG downloaded")}
-            />
-          </fieldset>
-        </div>
-        <Toolbar.Separator className="pi-mermaid-group-label" decorative>
-          Fullscreen
-        </Toolbar.Separator>
-        <Control
-          action="fullscreen"
-          icon={expanded ? ExitFullScreenIcon : EnterFullScreenIcon}
-          label={expanded ? "Close fullscreen" : "Open fullscreen"}
-          onAction={() => toggleFullscreen()}
-        />
+          {expanded ? <ExitFullScreenIcon /> : <EnterFullScreenIcon />}
+        </Toolbar.Button>
         <Toolbar.Button
           ref={moreRef}
           aria-controls={`${fullscreenTarget.id}-actions`}
@@ -388,9 +327,131 @@ function DiagramToolbar({
         >
           <DotsHorizontalIcon />
         </Toolbar.Button>
-        <span aria-live="polite" className="pi-mermaid-live">
-          {status}
-        </span>
+        <div
+          ref={secondaryRef}
+          id={`${fullscreenTarget.id}-actions`}
+          className={`pi-mermaid-secondary${moreOpen ? " is-open" : ""}`}
+        >
+          <fieldset
+            aria-label="Diagram view"
+            className="pi-mermaid-control-group"
+          >
+            <legend className="pi-mermaid-menu-heading">View</legend>
+            <Toolbar.Button
+              aria-label="Reset to readable view"
+              className="pi-mermaid-control is-labeled"
+              onClick={() => void resetCamera()}
+            >
+              <ResetIcon />
+              <span>Reset to readable view</span>
+            </Toolbar.Button>
+            {polishSupported ? (
+              <Toggle.Root
+                aria-label={
+                  polished ? "Use original style" : "Use polished style"
+                }
+                className="pi-mermaid-control is-labeled"
+                onPressedChange={async (pressed) => {
+                  try {
+                    const active = await onAction("display-mode", pressed);
+                    if (typeof active === "boolean") setPolished(active);
+                  } catch (error) {
+                    onError(error);
+                  }
+                }}
+                pressed={polished}
+              >
+                <MixerHorizontalIcon />
+                <span>
+                  {polished ? "Use original style" : "Use polished style"}
+                </span>
+                {polished ? <CheckIcon className="pi-mermaid-check" /> : null}
+              </Toggle.Root>
+            ) : null}
+            <Toggle.Root
+              aria-label="Trace edges"
+              className="pi-mermaid-control is-labeled"
+              disabled={!polishSupported}
+              onPressedChange={(pressed) => {
+                setTracing(pressed);
+                void Promise.resolve(onAction("trace", pressed)).catch(onError);
+              }}
+              pressed={tracing}
+            >
+              <ActivityLogIcon />
+              <span>Trace edges</span>
+              {tracing ? <CheckIcon className="pi-mermaid-check" /> : null}
+            </Toggle.Root>
+            <Toolbar.Button
+              aria-controls={`${fullscreenTarget.id}-source`}
+              aria-label={sourceVisible ? "Show diagram" : "Show source"}
+              aria-pressed={sourceVisible}
+              className="pi-mermaid-control is-labeled"
+              onClick={() => void toggleSource()}
+            >
+              {sourceVisible ? <EyeOpenIcon /> : <CodeIcon />}
+              <span>{sourceVisible ? "Show diagram" : "Show source"}</span>
+              {sourceVisible ? (
+                <CheckIcon className="pi-mermaid-check" />
+              ) : null}
+            </Toolbar.Button>
+          </fieldset>
+          <fieldset
+            aria-label="Diagram copy actions"
+            className="pi-mermaid-control-group"
+          >
+            <legend className="pi-mermaid-menu-heading">Copy</legend>
+            <Control
+              action="copy-source"
+              icon={CopyIcon}
+              label="Copy source"
+              labeled
+              onAction={() => runFeedback("copy-source", "Source copied")}
+              onError={onError}
+            />
+            <Control
+              action="copy-link"
+              icon={Link2Icon}
+              label="Copy diagram link"
+              labeled
+              onAction={() => runFeedback("copy-link", "Diagram link copied")}
+              onError={onError}
+            />
+            <Control
+              action="copy-svg"
+              icon={CopyIcon}
+              label="Copy SVG"
+              labeled
+              onAction={() => runFeedback("copy-svg", "SVG copied")}
+              onError={onError}
+            />
+          </fieldset>
+          <fieldset
+            aria-label="Diagram download actions"
+            className="pi-mermaid-control-group"
+          >
+            <legend className="pi-mermaid-menu-heading">Download</legend>
+            <Control
+              action="download-svg"
+              icon={DownloadIcon}
+              label="Download SVG"
+              labeled
+              onAction={() => runFeedback("download-svg", "SVG downloaded")}
+              onError={onError}
+            />
+            <Control
+              action="download-png"
+              icon={ImageIcon}
+              label="Download PNG"
+              labeled
+              onAction={() => runFeedback("download-png", "PNG downloaded")}
+              onError={onError}
+            />
+          </fieldset>
+          <span aria-live="polite" className="pi-mermaid-live" role="status">
+            {status}
+          </span>
+        </div>
       </Toolbar.Root>
     </Tooltip.Provider>
   );
@@ -402,17 +463,24 @@ export function mountDiagramToolbar(
 ): DiagramToolbarControls {
   let controls: DiagramToolbarControls = {
     announce: () => undefined,
+    destroy: () => undefined,
+    setCameraMode: () => undefined,
     setZoom: () => undefined,
   };
   const register = (next: DiagramToolbarControls) => {
     controls = next;
   };
-  createRoot(container).render(
-    createElement(DiagramToolbar, { ...props, register }),
-  );
+  const root = createRoot(container);
+  root.render(createElement(DiagramToolbar, { ...props, register }));
   return {
     announce(message) {
       controls.announce(message);
+    },
+    destroy() {
+      root.unmount();
+    },
+    setCameraMode(mode) {
+      controls.setCameraMode(mode);
     },
     setZoom(percentage) {
       controls.setZoom(percentage);

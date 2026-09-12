@@ -8,6 +8,7 @@ describe("repository shape", () => {
   test("is a private, flat Web app without a Pi extension", () => {
     const packageJson = JSON.parse(readFileSync("package.json", "utf8")) as {
       name?: string;
+      scripts?: Record<string, string>;
       private?: boolean;
       pi?: unknown;
       dependencies?: Record<string, string>;
@@ -24,6 +25,7 @@ describe("repository shape", () => {
     ).toBeUndefined();
     expect(existsSync("web")).toBe(false);
     expect(existsSync("src/extension")).toBe(false);
+    expect(packageJson.scripts?.build).toContain("build:bootstrap");
     expect(packageJson.dependencies).toMatchObject({
       "@radix-ui/colors": expect.any(String),
       "@radix-ui/react-icons": expect.any(String),
@@ -57,6 +59,7 @@ describe("repository shape", () => {
   });
 
   test.each([
+    ["bootstrap", "src/session-bootstrap.ts", "PiSessionBootstrap"],
     ["enhancer", "src/enhancer.ts", "PiMermaidEnhancer"],
     ["renderer", "src/mermaid-renderer.ts", "PiMermaidRenderer"],
   ])("builds the isolated browser-only %s runtime", (mode, entry, name) => {
@@ -78,7 +81,7 @@ describe("repository shape", () => {
       throw new Error("Expected a runtime library with a fileName function");
     }
     expect(lib.fileName("iife", "index")).toBe(`mermaid-${mode}.js`);
-    if (mode === "renderer") {
+    if (mode !== "enhancer") {
       expect(config.define?.__PI_KATEX_CSS__).toBeUndefined();
     }
   });
@@ -87,6 +90,16 @@ describe("repository shape", () => {
     expect(() =>
       runtimeConfig({ command: "build", mode: "production" }),
     ).toThrow("Unsupported runtime mode: production");
+  });
+
+  test("keeps the base bootstrap independent from optional rendering payloads", () => {
+    const bootstrap = readFileSync("src/session-bootstrap.ts", "utf8");
+    expect(bootstrap).toContain("installSessionStyle");
+    expect(bootstrap).not.toContain("installSessionUi");
+    expect(bootstrap).toContain("createMathParser");
+    expect(bootstrap).not.toMatch(/from ["'](?:katex|react|react-dom|mermaid)/);
+    expect(bootstrap).not.toContain("MathRenderer");
+    expect(bootstrap).not.toContain("createDiagramView");
   });
 
   test("embeds scoped KaTeX styles, licensed WOFF2 fonts and no external URLs", () => {

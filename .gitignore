@@ -141,6 +141,7 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+public/assets/mermaid-bootstrap.js
 public/assets/mermaid-enhancer.js
 public/assets/mermaid-renderer.js
 tests/.generated/

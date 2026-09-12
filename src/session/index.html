@@ -21,9 +21,23 @@
         <p class="eyebrow">Unable to load</p>
         <h1>Session unavailable</h1>
         <p id="error-message"></p>
-        <a href="%BASE_URL%">Back to pi-share-viewer</a>
+        <div class="error-actions">
+          <button id="error-retry" type="button" hidden>Retry session</button>
+          <a href="%BASE_URL%">Back to pi-share-viewer</a>
+        </div>
       </section>
     </main>
+
+    <aside
+      id="enhancement-status"
+      class="enhancement-status"
+      role="status"
+      aria-live="polite"
+      hidden
+    >
+      <span id="enhancement-message"></span>
+      <button id="enhancement-retry" type="button" hidden>Retry enhancements</button>
+    </aside>
 
     <iframe
       id="preview"

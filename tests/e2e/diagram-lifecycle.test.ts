@@ -32,6 +32,7 @@ test("exports SVG and PNG locally and opens stable diagram deep links", async ({
     });
   });
 
+  await card.getByRole("button", { name: "More diagram actions" }).click();
   await card.getByRole("button", { name: "Copy SVG" }).click();
   await expect
     .poll(() =>
@@ -108,7 +109,8 @@ test("prioritizes visible diagrams with at most two renderer sandboxes", async (
   await page.route("**/assets/mermaid-renderer.js", async (route) => {
     await route.fulfill({
       contentType: "application/javascript",
-      body: `window.addEventListener("message", (event) => {
+      body: `window.parent.postMessage({ type: "pi-mermaid-render-ready" }, "*");
+      window.addEventListener("message", (event) => {
         const request = event.data;
         setTimeout(() => window.parent.postMessage({
           type: "pi-mermaid-render-result",
@@ -152,7 +154,8 @@ test("retains the previous diagram and offers retry after theme render failure",
   await page.route("**/assets/mermaid-renderer.js", async (route) => {
     await route.fulfill({
       contentType: "application/javascript",
-      body: `window.addEventListener("message", (event) => {
+      body: `window.parent.postMessage({ type: "pi-mermaid-render-ready" }, "*");
+      window.addEventListener("message", (event) => {
         const request = event.data;
         if (!request.dark) {
           window.parent.postMessage({
@@ -199,7 +202,8 @@ test("terminates an isolated renderer when its deadline expires", async ({
   await page.route("**/assets/mermaid-renderer.js", async (route) => {
     await route.fulfill({
       contentType: "application/javascript",
-      body: `window.addEventListener("message", (event) => {
+      body: `window.parent.postMessage({ type: "pi-mermaid-render-ready" }, "*");
+      window.addEventListener("message", (event) => {
         const request = event.data;
         if (request.source.includes("Broken")) {
           window.parent.postMessage({
