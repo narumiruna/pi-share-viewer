@@ -96,7 +96,6 @@ test("loads a real Pi export and enhances Mermaid diagrams", async ({
   await expect(card.getByLabel("Current zoom")).toHaveText("125%");
   await card.getByRole("button", { name: "Zoom out" }).click();
   await expect(stage).toHaveAttribute("style", /scale\(1\)/);
-  await card.getByRole("button", { name: "Show overview" }).click();
 
   const viewport = card.locator(".pi-mermaid-viewport");
   for (let index = 0; index < 6; index += 1) {
@@ -610,7 +609,7 @@ test("renders safely at mobile and desktop sizes in dark and light sessions", as
     for (const control of [
       "Zoom out",
       "Zoom in",
-      "Show overview",
+      "Use readable view",
       "Open fullscreen to pan",
     ]) {
       await expect(
@@ -720,7 +719,6 @@ stateDiagram-v2
     expect(await card.locator("[data-pi-edge=true]").count()).toBeGreaterThan(
       0,
     );
-    await card.getByRole("button", { name: "Show overview" }).click();
     const viewportBox = await card
       .locator(".pi-mermaid-viewport")
       .boundingBox();

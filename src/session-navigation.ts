@@ -90,6 +90,21 @@ export function installSessionNavigation(
     noTools.textContent = "Hide tool entries";
     noTools.title = "Hide tool entries in navigation only";
   }
+  let defaultFilterApplied = false;
+  const applyDefaultFilter = () => {
+    if (defaultFilterApplied || !noTools) return false;
+    const defaultFilter = document.querySelector<HTMLButtonElement>(
+      '.filter-btn[data-filter="default"]',
+    );
+    if (!defaultFilter?.classList.contains("active")) {
+      defaultFilterApplied = true;
+      return false;
+    }
+    noTools.click();
+    defaultFilterApplied = noTools.classList.contains("active");
+    return defaultFilterApplied;
+  };
+  const defaultFilterFrame = requestAnimationFrame(applyDefaultFilter);
 
   const setDrawer = (open: boolean, restoreFocus = true) => {
     if (!mobile.matches) open = false;
@@ -246,6 +261,7 @@ export function installSessionNavigation(
   };
 
   const onTreeRender = (event: Event) => {
+    if (applyDefaultFilter()) return;
     enhanceTree((event as CustomEvent<TreeRenderDetail>).detail);
     scheduleReadingLocation();
   };
@@ -299,6 +315,7 @@ export function installSessionNavigation(
   scheduleReadingLocation();
 
   return () => {
+    cancelAnimationFrame(defaultFilterFrame);
     cancelAnimationFrame(readingFrame);
     document.removeEventListener("pi-session-tree-render", onTreeRender);
     document.removeEventListener("pi-session-render", onSessionRender);

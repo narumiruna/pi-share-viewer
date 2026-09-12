@@ -516,7 +516,7 @@ function mountRenderedDiagram(
   ensureAccessibleSvg(svg, decoration.kind, diagramNumber);
   viewport.setAttribute(
     "aria-label",
-    `Interactive ${decoration.kind} diagram in readable view. Use arrow keys to pan, plus or minus to zoom, and zero for overview.`,
+    `Interactive ${decoration.kind} diagram fitted to overview. Use arrow keys to pan, plus or minus to zoom, and zero to refit.`,
   );
   record.card.dataset.piMermaidKind = decoration.kind;
   record.card.dataset.piMermaidDisplay = record.displayMode;

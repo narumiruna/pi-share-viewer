@@ -132,6 +132,43 @@ for (const viewport of [
   }
 }
 
+test("Reading mode hides assistant entries with only hidden details", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockGist(page, await createReviewExportFixture());
+  await page.goto(`/session/#${DARK_GIST_ID}`);
+  const frame = page.frameLocator("#preview");
+  const emptyAssistant = frame.locator("#entry-reading-empty");
+
+  await frame.locator("#messages").evaluate((messages) => {
+    const assistant = document.createElement("div");
+    assistant.id = "entry-reading-empty";
+    assistant.className = "assistant-message";
+    assistant.innerHTML = `
+      <div class="thinking-block">
+        <div class="thinking-text">Hidden reasoning</div>
+        <div class="thinking-collapsed">Thinking ...</div>
+      </div>
+      <div class="tool-execution"><div class="tool-header">Hidden tool</div></div>
+    `;
+    messages.prepend(assistant);
+    document.dispatchEvent(new CustomEvent("pi-session-render"));
+  });
+
+  await expect(emptyAssistant).toBeHidden();
+  await frame
+    .getByRole("button", { name: "Show thinking", exact: true })
+    .click();
+  await expect(emptyAssistant).toBeVisible();
+  await frame
+    .getByRole("button", { name: "Hide thinking", exact: true })
+    .click();
+  await expect(emptyAssistant).toBeHidden();
+  await frame.getByRole("button", { name: "Show tools", exact: true }).click();
+  await expect(emptyAssistant).toBeVisible();
+});
+
 test("Reading and Inspect controls reflect content and survive branch renders", async ({
   page,
 }) => {
@@ -141,19 +178,35 @@ test("Reading and Inspect controls reflect content and survive branch renders", 
   const frame = page.frameLocator("#preview");
   const root = frame.locator("html");
 
+  await expect(
+    frame.locator("#entry-22222222 .thinking-collapsed"),
+  ).toBeHidden();
   const systemPrompt = frame.locator("details.system-prompt");
   await systemPrompt.locator("summary").click();
   await expect(systemPrompt.locator(".system-prompt-full")).toBeVisible();
   await expect(systemPrompt).toContainText("Sanitized system instruction 28");
+  expect(
+    await systemPrompt
+      .locator(".pi-session-disclosure-body")
+      .evaluate((body) => ({
+        bounded: body.clientHeight <= innerHeight * 0.7 + 1,
+        overflow: getComputedStyle(body).overflowY,
+      })),
+  ).toEqual({ bounded: true, overflow: "auto" });
   await expect(
     systemPrompt.locator(".system-prompt-preview, .system-prompt-expand-hint"),
   ).toHaveCount(0);
   const availableTools = frame.locator("details.tools-list");
   await availableTools.locator("summary").click();
   await expect(availableTools).toContainText("Sanitized read tool definition");
+  await expect(availableTools.locator(".pi-session-disclosure-body")).toHaveCSS(
+    "overflow-y",
+    "auto",
+  );
 
   await frame.getByRole("button", { name: "Inspect", exact: true }).click();
   await expect(root).toHaveAttribute("data-pi-session-mode", "inspect");
+  await expect(frame.locator("#entry-22222222 .thinking-text")).toBeVisible();
   await expect(
     frame.getByRole("button", { name: "Hide tools", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");

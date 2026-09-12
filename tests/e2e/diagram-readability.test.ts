@@ -12,7 +12,7 @@ for (const viewport of [
   { width: 1440, height: 900 },
 ]) {
   for (const theme of ["dark", "light"] as const) {
-    test(`keeps review diagrams readable at ${viewport.width}px in ${theme}`, async ({
+    test(`fits review diagrams on first render at ${viewport.width}px in ${theme}`, async ({
       page,
     }) => {
       test.setTimeout(60_000);
@@ -42,45 +42,32 @@ for (const viewport of [
         );
         await expect(card).toHaveAttribute(
           "data-pi-mermaid-camera",
-          "readable",
+          "overview",
         );
         const metrics = await card.evaluate((element) => {
-          const stage = element.querySelector<HTMLElement>(".pi-mermaid-stage");
           const viewport = element.querySelector<HTMLElement>(
             ".pi-mermaid-viewport",
           );
           const svg = element.querySelector<SVGSVGElement>(
             ".pi-mermaid-stage > svg",
           );
-          if (!stage || !viewport || !svg)
-            throw new Error("Diagram view missing");
-          const matrix = new DOMMatrix(getComputedStyle(stage).transform);
-          const labels = [
-            ...svg.querySelectorAll<SVGElement>(
-              "text, foreignObject span, foreignObject p",
-            ),
-          ];
-          const effective = labels
-            .map(
-              (label) =>
-                Number.parseFloat(getComputedStyle(label).fontSize) * matrix.a,
-            )
-            .filter((size) => Number.isFinite(size) && size > 0);
+          if (!viewport || !svg) throw new Error("Diagram view missing");
+          const view = viewport.getBoundingClientRect();
+          const diagram = svg.getBoundingClientRect();
           return {
             cropped: viewport.dataset.piDiagramCropped,
-            effective: Math.min(...effective),
+            fits:
+              diagram.width <= view.width + 1 &&
+              diagram.height <= view.height + 1,
             pageOverflow:
               document.documentElement.scrollWidth >
               document.documentElement.clientWidth + 1,
           };
         });
-        expect(metrics.effective).toBeGreaterThanOrEqual(13.9);
+        expect(metrics.cropped).toBe("false");
+        expect(metrics.fits).toBe(true);
         expect(metrics.pageOverflow).toBe(false);
-        if (metrics.cropped === "true") {
-          await expect(card.locator(".pi-mermaid-pan-hint")).toContainText(
-            "Open fullscreen to pan",
-          );
-        }
+        await expect(card.locator(".pi-mermaid-pan-hint")).toBeHidden();
         await card.screenshot({
           path: `test-results/review-diagram-${index}-${viewport.width}-${theme}.png`,
         });
@@ -103,35 +90,23 @@ test("switches explicitly between readable and overview cameras", async ({
   });
   const viewport = card.locator(".pi-mermaid-viewport");
   const stage = card.locator(".pi-mermaid-stage");
-  const readableTransform = await stage.getAttribute("style");
-  await expect(
-    card.getByRole("button", { name: "Show overview", exact: true }),
-  ).toBeVisible();
-  await card
-    .getByRole("button", { name: "Show overview", exact: true })
-    .click();
-  await expect(card).toHaveAttribute("data-pi-mermaid-camera", "overview");
+  const overviewTransform = await stage.getAttribute("style");
   await expect(
     card.getByRole("button", { name: "Use readable view", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
-  expect(
-    await card.evaluate((element) => {
-      const viewport = element.querySelector(".pi-mermaid-viewport");
-      const svg = element.querySelector(".pi-mermaid-stage > svg");
-      if (!viewport || !svg) return false;
-      const view = viewport.getBoundingClientRect();
-      const diagram = svg.getBoundingClientRect();
-      return (
-        diagram.width <= view.width + 1 && diagram.height <= view.height + 1
-      );
-    }),
-  ).toBe(true);
-
   await card
     .getByRole("button", { name: "Use readable view", exact: true })
     .click();
-  await expect(stage).toHaveAttribute("style", readableTransform ?? "");
   await expect(card).toHaveAttribute("data-pi-mermaid-camera", "readable");
+  await expect(
+    card.getByRole("button", { name: "Show overview", exact: true }),
+  ).toHaveAttribute("aria-pressed", "false");
+
+  await card
+    .getByRole("button", { name: "Show overview", exact: true })
+    .click();
+  await expect(stage).toHaveAttribute("style", overviewTransform ?? "");
+  await expect(card).toHaveAttribute("data-pi-mermaid-camera", "overview");
 
   await viewport.focus();
   await viewport.press("+");
@@ -155,6 +130,9 @@ test("fullscreen preserves readable sizing, guidance, isolation, and focus", asy
   await expect(card).toHaveAttribute("data-pi-mermaid-state", "rendered", {
     timeout: 30_000,
   });
+  await card
+    .getByRole("button", { name: "Use readable view", exact: true })
+    .click();
   await card.evaluate((element) => {
     element.requestFullscreen = () => Promise.reject(new Error("fallback"));
   });

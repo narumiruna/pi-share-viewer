@@ -21,9 +21,9 @@ test("long formulas expose conditional, keyboard-reachable overflow guidance", a
   });
   await shell.scrollIntoViewIfNeeded();
   await expect(shell).toHaveAttribute("data-pi-math-overflow", "true");
-  await expect(shell.locator(".pi-math-overflow-hint")).toContainText(
-    "Scroll formula",
-  );
+  const overflowHint = shell.locator(".pi-math-overflow-hint");
+  await expect(overflowHint).toContainText("Scroll formula");
+  await expect(overflowHint).toHaveCSS("border-top-style", "solid");
   const formula = shell.locator(".pi-math");
   await expect(formula).toHaveAttribute("tabindex", "0");
   await formula.evaluate((element) => element.focus());

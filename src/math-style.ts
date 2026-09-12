@@ -62,11 +62,17 @@ export function installMathStyle(): void {
   min-height: 1.25rem; color: var(--accent); font-size: 11px;
   overflow-wrap: anywhere;
 }
+[data-pi-session-ui="radix"] .pi-math-shell[data-pi-math-overflow-right="true"]::after {
+  content: ""; position: absolute; z-index: 1; top: 0; right: 0; bottom: 0;
+  width: 2rem; background: linear-gradient(90deg, transparent, var(--container-bg));
+  pointer-events: none;
+}
 [data-pi-session-ui="radix"] .pi-math-overflow-hint {
   position: absolute; z-index: 2; right: 4px; bottom: 2px;
-  border-radius: 3px; background: color-mix(in srgb, var(--container-bg) 90%, transparent);
-  color: var(--muted); padding: 2px 5px; font: 600 10px/1.3 ui-monospace, monospace;
-  pointer-events: none;
+  border: 1px solid var(--borderAccent); border-radius: 3px;
+  background: color-mix(in srgb, var(--container-bg) 94%, transparent);
+  color: var(--text); padding: 2px 5px; font: 700 10px/1.3 ui-monospace, monospace;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 20%); pointer-events: none;
 }
 [data-pi-session-ui="radix"] .pi-math-overflow-hint[hidden] { display: none; }
 @media (hover: none), (pointer: coarse) {

@@ -23,6 +23,10 @@ test("search and filters describe navigation scope honestly", async ({
     frame.getByRole("button", { name: "Hide tool entries", exact: true }),
   ).toHaveAttribute("title", "Hide tool entries in navigation only");
   await expect(
+    frame.getByRole("button", { name: "Hide tool entries", exact: true }),
+  ).toHaveClass(/active/);
+  await expect(frame.locator('.tree-node[data-id="33333333"]')).toHaveCount(0);
+  await expect(
     frame.getByRole("button", { name: "Show tools", exact: true }),
   ).toHaveAttribute("aria-pressed", "false");
 
@@ -48,6 +52,8 @@ test("search and filters describe navigation scope honestly", async ({
           .length,
     );
   expect(visibleTools).toBeGreaterThan(0);
+  await frame.getByRole("button", { name: "Default", exact: true }).click();
+  await expect(frame.locator('.tree-node[data-id="33333333"]')).toHaveCount(1);
   await frame
     .getByRole("button", { name: "Hide tool entries", exact: true })
     .click();
@@ -106,6 +112,7 @@ test("a hidden tool deep link reveals only its target", async ({ page }) => {
     "false",
   );
 
+  await frame.getByRole("button", { name: "Default", exact: true }).click();
   await frame.locator('.tree-node[data-id="33333333"] .pi-tree-action').click();
   const target = frame.locator("#tool-call-tool-read-1");
   await expect(target).toBeVisible();
@@ -127,6 +134,33 @@ test("a hidden tool deep link reveals only its target", async ({ page }) => {
   await expect(
     frame.locator('.tool-execution[data-pi-revealed="true"]'),
   ).toHaveCount(0);
+});
+
+test("mobile page controls do not cover content while scrolling", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockGist(page, await createReviewExportFixture());
+  await page.goto(`/session/#${DARK_GIST_ID}`);
+  const frame = page.frameLocator("#preview");
+  const controls = frame.locator("#hamburger, .pi-session-theme-toggle");
+
+  await expect(controls).toHaveCount(2);
+  expect(
+    await controls.evaluateAll((elements) =>
+      elements.map((element) => getComputedStyle(element).position),
+    ),
+  ).toEqual(["absolute", "absolute"]);
+  await frame.locator("body").evaluate(() => scrollTo(0, 500));
+  await expect
+    .poll(() =>
+      controls.evaluateAll((elements) =>
+        elements.every(
+          (element) => element.getBoundingClientRect().bottom <= 0,
+        ),
+      ),
+    )
+    .toBe(true);
 });
 
 test("mobile drawer traps focus, dismisses predictably, and restores layout state", async ({

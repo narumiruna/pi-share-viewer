@@ -420,7 +420,10 @@ const SESSION_STYLE = `
   cursor: pointer;
 }
 [data-pi-session-ui="radix"] .pi-session-disclosure-body {
+  max-height: min(70vh, 42rem);
   padding: 0 14px 14px;
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 [data-pi-session-ui="radix"] .pi-message-role {
   display: flex;
@@ -467,12 +470,15 @@ const SESSION_STYLE = `
   display: none !important;
 }
 [data-pi-session-ui="radix"][data-pi-show-thinking="false"] .thinking-collapsed {
-  display: block !important;
+  display: none !important;
 }
 [data-pi-session-ui="radix"][data-pi-show-thinking="true"] .thinking-text {
   display: block !important;
 }
 [data-pi-session-ui="radix"][data-pi-show-thinking="true"] .thinking-collapsed {
+  display: none !important;
+}
+[data-pi-session-ui="radix"][data-pi-show-thinking="false"][data-pi-show-tools="false"] .assistant-message[data-pi-reading-empty="true"] {
   display: none !important;
 }
 [data-pi-session-ui="radix"] .copy-link-btn {
@@ -546,6 +552,9 @@ const SESSION_STYLE = `
   }
 }
 @media (max-width: 900px) {
+  [data-pi-session-ui="radix"] :is(#hamburger, .pi-session-theme-toggle) {
+    position: absolute;
+  }
   [data-pi-session-ui="radix"] #sidebar {
     width: min(var(--sidebar-width), calc(100vw - 40px));
     min-width: min(var(--sidebar-width), calc(100vw - 40px));

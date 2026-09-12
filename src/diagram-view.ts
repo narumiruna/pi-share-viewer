@@ -80,7 +80,7 @@ export function createDiagramView(
   options: DiagramViewOptions = {},
 ): DiagramViewController {
   const state: DiagramViewState = {
-    cameraMode: "readable",
+    cameraMode: "overview",
     naturalHeight: 1,
     naturalWidth: 1,
     scale: 1,
@@ -503,7 +503,7 @@ export function createDiagramView(
       : undefined;
   resizeObserver?.observe(viewport);
 
-  showReadable();
+  showOverview();
 
   return {
     destroy() {

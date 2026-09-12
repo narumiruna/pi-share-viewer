@@ -232,8 +232,14 @@ export function installSessionUi(): () => void {
       addRole(message, "User");
     for (const message of document.querySelectorAll<HTMLElement>(
       ".assistant-message",
-    ))
+    )) {
       addRole(message, "Assistant");
+      message.dataset.piReadingEmpty = String(
+        !message.querySelector(
+          ":scope > .assistant-text, :scope > .error-text, :scope > .message-images",
+        ),
+      );
+    }
     for (const message of document.querySelectorAll<HTMLElement>(
       ".tool-execution",
     )) {

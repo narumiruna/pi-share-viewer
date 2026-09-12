@@ -35,7 +35,7 @@ for (const width of [320, 640, 1440]) {
     for (const name of [
       "Zoom out",
       "Zoom in",
-      "Show overview",
+      "Use readable view",
       "Open fullscreen to pan",
       "More diagram actions",
     ]) {
