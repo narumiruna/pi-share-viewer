@@ -1,5 +1,6 @@
 import {
   ActivityLogIcon,
+  CheckIcon,
   CodeIcon,
   CopyIcon,
   CornersIcon,
@@ -326,19 +327,16 @@ function DiagramToolbar({
         >
           <DotsHorizontalIcon />
         </Toolbar.Button>
-        <span aria-live="polite" className="pi-mermaid-live" role="status">
-          {status}
-        </span>
-
         <div
           ref={secondaryRef}
           id={`${fullscreenTarget.id}-actions`}
           className={`pi-mermaid-secondary${moreOpen ? " is-open" : ""}`}
         >
           <fieldset
-            aria-label="Reset diagram view"
+            aria-label="Diagram view"
             className="pi-mermaid-control-group"
           >
+            <legend className="pi-mermaid-menu-heading">View</legend>
             <Toolbar.Button
               aria-label="Reset to readable view"
               className="pi-mermaid-control is-labeled"
@@ -347,11 +345,6 @@ function DiagramToolbar({
               <ResetIcon />
               <span>Reset to readable view</span>
             </Toolbar.Button>
-          </fieldset>
-          <fieldset
-            aria-label="Diagram presentation"
-            className="pi-mermaid-control-group"
-          >
             {polishSupported ? (
               <Toggle.Root
                 aria-label={
@@ -372,6 +365,7 @@ function DiagramToolbar({
                 <span>
                   {polished ? "Use original style" : "Use polished style"}
                 </span>
+                {polished ? <CheckIcon className="pi-mermaid-check" /> : null}
               </Toggle.Root>
             ) : null}
             <Toggle.Root
@@ -386,12 +380,8 @@ function DiagramToolbar({
             >
               <ActivityLogIcon />
               <span>Trace edges</span>
+              {tracing ? <CheckIcon className="pi-mermaid-check" /> : null}
             </Toggle.Root>
-          </fieldset>
-          <fieldset
-            aria-label="Diagram source"
-            className="pi-mermaid-control-group"
-          >
             <Toolbar.Button
               aria-controls={`${fullscreenTarget.id}-source`}
               aria-label={sourceVisible ? "Show diagram" : "Show source"}
@@ -401,7 +391,16 @@ function DiagramToolbar({
             >
               {sourceVisible ? <EyeOpenIcon /> : <CodeIcon />}
               <span>{sourceVisible ? "Show diagram" : "Show source"}</span>
+              {sourceVisible ? (
+                <CheckIcon className="pi-mermaid-check" />
+              ) : null}
             </Toolbar.Button>
+          </fieldset>
+          <fieldset
+            aria-label="Diagram copy actions"
+            className="pi-mermaid-control-group"
+          >
+            <legend className="pi-mermaid-menu-heading">Copy</legend>
             <Control
               action="copy-source"
               icon={CopyIcon}
@@ -410,11 +409,6 @@ function DiagramToolbar({
               onAction={() => runFeedback("copy-source", "Source copied")}
               onError={onError}
             />
-          </fieldset>
-          <fieldset
-            aria-label="Diagram sharing and export"
-            className="pi-mermaid-control-group"
-          >
             <Control
               action="copy-link"
               icon={Link2Icon}
@@ -431,6 +425,12 @@ function DiagramToolbar({
               onAction={() => runFeedback("copy-svg", "SVG copied")}
               onError={onError}
             />
+          </fieldset>
+          <fieldset
+            aria-label="Diagram download actions"
+            className="pi-mermaid-control-group"
+          >
+            <legend className="pi-mermaid-menu-heading">Download</legend>
             <Control
               action="download-svg"
               icon={DownloadIcon}
@@ -448,6 +448,9 @@ function DiagramToolbar({
               onError={onError}
             />
           </fieldset>
+          <span aria-live="polite" className="pi-mermaid-live" role="status">
+            {status}
+          </span>
         </div>
       </Toolbar.Root>
     </Tooltip.Provider>

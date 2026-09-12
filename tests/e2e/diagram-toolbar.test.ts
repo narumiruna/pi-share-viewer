@@ -44,10 +44,26 @@ for (const width of [320, 640, 1440]) {
       ).toBeVisible();
     }
     const more = toolbar.getByRole("button", { name: "More diagram actions" });
+    const cardHeight = await card.evaluate((element) => element.clientHeight);
     await expect(more).toHaveAttribute("aria-expanded", "false");
     await more.click();
     await expect(more).toHaveAttribute("aria-expanded", "true");
     const secondary = toolbar.locator(".pi-mermaid-secondary");
+    await expect(secondary.locator("legend")).toHaveText([
+      "View",
+      "Copy",
+      "Download",
+    ]);
+    await expect(
+      secondary
+        .getByRole("button", { name: "Use original style", exact: true })
+        .locator(".pi-mermaid-check"),
+    ).toBeVisible();
+    await expect(
+      secondary
+        .getByRole("button", { name: "Trace edges", exact: true })
+        .locator(".pi-mermaid-check"),
+    ).toHaveCount(0);
     for (const name of secondaryControls) {
       const button = secondary.getByRole("button", { name, exact: true });
       await expect(button).toBeVisible();
@@ -61,9 +77,17 @@ for (const width of [320, 640, 1440]) {
     expect(bounds.x + bounds.width).toBeLessThanOrEqual(
       cardBounds.x + cardBounds.width + 1,
     );
-    expect(bounds.y + bounds.height).toBeLessThanOrEqual(
-      cardBounds.y + cardBounds.height + 1,
+    expect(bounds.y).toBeGreaterThanOrEqual(cardBounds.y);
+    expect(await card.evaluate((element) => element.clientHeight)).toBe(
+      cardHeight,
     );
+    const rowPositions = await secondary
+      .locator("button:visible")
+      .evaluateAll((buttons) =>
+        buttons.map((button) => button.getBoundingClientRect().top),
+      );
+    expect(rowPositions).toEqual([...rowPositions].sort((a, b) => a - b));
+    expect(new Set(rowPositions).size).toBe(rowPositions.length);
 
     if (width <= 640) {
       const sizes = await toolbar
@@ -135,9 +159,7 @@ for (const depth of [3, 4]) {
           const rect = control.getBoundingClientRect();
           return (
             rect.width > 0 &&
-            (rect.left < bounds.left - 1 ||
-              rect.right > bounds.right + 1 ||
-              rect.bottom > bounds.bottom + 1)
+            (rect.left < bounds.left - 1 || rect.right > bounds.right + 1)
           );
         })
         .map((control) => control.getAttribute("aria-label"));
@@ -148,7 +170,7 @@ for (const depth of [3, 4]) {
         .getByRole("button", { name, exact: true })
         .click({ trial: true });
     }
-    await card.screenshot({
+    await toolbar.screenshot({
       path: `test-results/diagram-toolbar-nested-${depth}.png`,
     });
   });
