@@ -30,7 +30,9 @@ test("loads a real Pi export and enhances Mermaid diagrams", async ({
     frame.getByText("A normal Markdown paragraph.", { exact: true }),
   ).toBeVisible();
   await renderEntryDiagrams(frame, 1);
-  await expect(frame.locator(".pi-mermaid-card")).toHaveCount(2);
+  await expect(
+    frame.locator(".pi-mermaid-card, .pi-mermaid-error-card"),
+  ).toHaveCount(2);
   const polishedCard = frame.locator("#a1b2c3d4-diagram-1");
   await expect(polishedCard.locator("svg.pi-mermaid-polished")).toBeVisible();
   await expect(polishedCard).toHaveAttribute(
@@ -47,7 +49,7 @@ test("loads a real Pi export and enhances Mermaid diagrams", async ({
   await expect(
     polishedCard.getByText("flowchart", { exact: true }),
   ).toBeVisible();
-  const invalidCard = frame.locator(".pi-mermaid-card").last();
+  const invalidCard = frame.locator("#b2c3d4e5-diagram-1");
   await invalidCard.scrollIntoViewIfNeeded();
   const renderError = frame.locator(".pi-mermaid-error-card .pi-mermaid-error");
   await expect(renderError).toContainText("Mermaid syntax error near line 3");
@@ -65,7 +67,7 @@ test("loads a real Pi export and enhances Mermaid diagrams", async ({
     "dark",
   );
   await expect(frame.locator("html")).toHaveAttribute(
-    "data-pi-session-ui",
+    "data-pi-session-skin",
     "radix",
   );
 

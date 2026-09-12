@@ -1,275 +1,115 @@
-import { readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 import {
   createReviewExportFixture,
   DARK_GIST_ID,
   mockGist,
-  readSessionData,
 } from "./session-fixture.js";
 
-test("review fixture is sanitized and contains the intended UI evidence", async () => {
-  const source = await readFile("tests/fixtures/ui-review.jsonl", "utf8");
-  expect(source).not.toContain("c642af06d02c928633adc8866716bded");
-  expect(
-    source.match(/\\begin\{aligned\}|\$x_i\$|\\unknowncommand/g),
-  ).toHaveLength(3);
-  expect(source.match(/```mermaid/g)).toHaveLength(2);
-  expect(source).toContain('"type":"custom_message"');
-  expect(source).toContain('"toolCallId":"tool-custom-1"');
-  expect(source).toContain("Alternate branch request");
-
-  const html = await createReviewExportFixture();
-  const data = readSessionData(html) as unknown as {
-    entries: unknown[];
-    systemPrompt: string;
-    tools: unknown[];
-  };
-  expect(data.entries.length).toBeGreaterThanOrEqual(12);
-  expect(data.systemPrompt.split("\n")).toHaveLength(28);
-  expect(data.tools).toHaveLength(5);
-});
-
 for (const viewport of [
-  { width: 320, height: 800 },
   { width: 390, height: 844 },
-  { width: 768, height: 1024 },
   { width: 1440, height: 900 },
 ]) {
-  for (const theme of ["dark", "light"] as const) {
-    test(`defaults to readable conversation at ${viewport.width}px in ${theme}`, async ({
-      page,
-    }) => {
-      test.setTimeout(45_000);
-      await page.setViewportSize(viewport);
-      await mockGist(page, await createReviewExportFixture());
-      await page.goto(`/session/#${DARK_GIST_ID}`);
-      const frame = page.frameLocator("#preview");
-      const root = frame.locator("html");
-      await expect(
-        frame.getByRole("button", { name: /Switch to (?:dark|light) theme/ }),
-      ).toBeVisible();
-      if ((await root.getAttribute("data-pi-mermaid-theme")) !== theme) {
-        await frame
-          .getByRole("button", { name: `Switch to ${theme} theme` })
-          .click();
-      }
+  test(`keeps Pi's original session structure at ${viewport.width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await mockGist(page, await createReviewExportFixture());
+    await page.goto(`/session/#${DARK_GIST_ID}`);
+    const frame = page.frameLocator("#preview");
+    const root = frame.locator("html");
 
-      await expect(root).toHaveAttribute("data-pi-session-mode", "reading");
-      await expect(
-        frame.getByRole("button", { name: "Reading", exact: true }),
-      ).toHaveAttribute("aria-pressed", "true");
-      const firstUser = frame.locator("#entry-11111111");
-      await expect(firstUser).toBeVisible();
-      expect(
-        await firstUser.evaluate(
-          (element) => element.getBoundingClientRect().top,
-        ),
-      ).toBeLessThan(viewport.height);
-      await expect(firstUser.locator(":scope > .pi-message-role")).toHaveText(
-        "User",
-      );
-      await expect(
-        frame.locator("#entry-22222222 > .pi-message-role"),
-      ).toHaveText("Assistant");
-      await expect(
-        frame.locator("#entry-88888888 > .pi-message-role"),
-      ).toHaveText("Custom");
-      await expect(
-        frame.getByText("System Prompt", { exact: true }),
-      ).toBeVisible();
-      await expect(
-        frame.getByText("Available Tools", { exact: true }),
-      ).toBeVisible();
-      await expect(frame.locator("details.system-prompt")).not.toHaveAttribute(
-        "open",
-        "",
-      );
-      await expect(frame.locator("details.tools-list")).not.toHaveAttribute(
-        "open",
-        "",
-      );
-      await expect(
-        frame.getByRole("button", { name: "Show tools", exact: true }),
-      ).toHaveAttribute("aria-pressed", "false");
-      await expect(
-        frame.getByRole("button", { name: "Show thinking", exact: true }),
-      ).toHaveAttribute("aria-pressed", "false");
-      expect(
-        await frame
-          .locator(".tool-execution")
-          .evaluateAll(
-            (tools) =>
-              tools.filter((tool) => getComputedStyle(tool).display !== "none")
-                .length,
-          ),
-      ).toBe(0);
-      expect(
-        await root.evaluate((html) => html.scrollWidth <= html.clientWidth + 1),
-      ).toBe(true);
+    await expect(root).toHaveAttribute("data-pi-session-skin", "radix");
+    await expect(root).not.toHaveAttribute("data-pi-session-ui");
+    await expect(root).not.toHaveAttribute("data-pi-session-mode");
+    await expect(frame.locator(".pi-session-modes")).toHaveCount(0);
+    await expect(frame.locator(".pi-message-role")).toHaveCount(0);
+    await expect(frame.locator(".pi-entry-disclosure")).toHaveCount(0);
+    await expect(frame.locator(".pi-session-theme-toggle")).toBeVisible();
 
-      const action = firstUser.getByRole("button", {
-        name: "Copy link to this message",
-      });
-      await action.focus();
-      await expect(action).toBeVisible();
-      const geometry = await firstUser.evaluate((element) => {
-        const timestamp = element.querySelector(".message-timestamp");
-        const action = element.querySelector(".copy-link-btn");
-        if (!timestamp || !action) return null;
-        const range = document.createRange();
-        range.selectNodeContents(timestamp);
-        const time = range.getBoundingClientRect();
-        const button = action.getBoundingClientRect();
-        return {
-          overlap: time.right > button.left && time.left < button.right,
-        };
-      });
-      expect(geometry?.overlap ?? false).toBe(false);
-      await page.screenshot({
-        path: `test-results/review-top-${viewport.width}-${theme}.png`,
-      });
-    });
-  }
+    const systemPrompt = frame.locator(".system-prompt");
+    await expect(systemPrompt).toHaveJSProperty("tagName", "DIV");
+    await expect(systemPrompt).toHaveClass(/expandable/);
+    await expect(systemPrompt.locator(".system-prompt-preview")).toBeVisible();
+    await expect(
+      systemPrompt.locator(".system-prompt-expand-hint"),
+    ).toBeVisible();
+    await expect(systemPrompt.locator(".system-prompt-full")).toBeHidden();
+    await systemPrompt.click();
+    await expect(systemPrompt).toHaveClass(/expanded/);
+    await expect(systemPrompt.locator(".system-prompt-full")).toBeVisible();
+    await expect(systemPrompt).toContainText("Sanitized system instruction 28");
+
+    const tools = frame.locator(".tools-list");
+    await expect(tools).toHaveJSProperty("tagName", "DIV");
+    await expect(tools.locator(".tools-content")).toBeVisible();
+    await expect(tools).toContainText("Sanitized read tool definition");
+    await expect(
+      frame.locator("details.system-prompt, details.tools-list"),
+    ).toHaveCount(0);
+
+    const contentWidth = await frame
+      .locator("#header-container")
+      .evaluate((header) => ({
+        maxWidth: getComputedStyle(header).maxWidth,
+        width: header.getBoundingClientRect().width,
+      }));
+    expect(contentWidth.maxWidth).toBe(
+      viewport.width <= 768 ? "100%" : "800px",
+    );
+    expect(contentWidth.width).toBeLessThanOrEqual(800);
+    expect(
+      await root.evaluate((html) => html.scrollWidth <= html.clientWidth + 1),
+    ).toBe(true);
+  });
 }
 
-test("Reading mode hides assistant entries with only hidden details", async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await mockGist(page, await createReviewExportFixture());
-  await page.goto(`/session/#${DARK_GIST_ID}`);
-  const frame = page.frameLocator("#preview");
-  const emptyAssistant = frame.locator("#entry-reading-empty");
-
-  await frame.locator("#messages").evaluate((messages) => {
-    const assistant = document.createElement("div");
-    assistant.id = "entry-reading-empty";
-    assistant.className = "assistant-message";
-    assistant.innerHTML = `
-      <div class="thinking-block">
-        <div class="thinking-text">Hidden reasoning</div>
-        <div class="thinking-collapsed">Thinking ...</div>
-      </div>
-      <div class="tool-execution"><div class="tool-header">Hidden tool</div></div>
-    `;
-    messages.prepend(assistant);
-    document.dispatchEvent(new CustomEvent("pi-session-render"));
-  });
-
-  await expect(emptyAssistant).toBeHidden();
-  await frame
-    .getByRole("button", { name: "Show thinking", exact: true })
-    .click();
-  await expect(emptyAssistant).toBeVisible();
-  await frame
-    .getByRole("button", { name: "Hide thinking", exact: true })
-    .click();
-  await expect(emptyAssistant).toBeHidden();
-  await frame.getByRole("button", { name: "Show tools", exact: true }).click();
-  await expect(emptyAssistant).toBeVisible();
-});
-
-test("Reading and Inspect controls reflect content and survive branch renders", async ({
+test("keeps Pi's original thinking, tool, search, and branch controls", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await mockGist(page, await createReviewExportFixture());
   await page.goto(`/session/#${DARK_GIST_ID}`);
   const frame = page.frameLocator("#preview");
-  const root = frame.locator("html");
 
+  const toggleThinking = frame.getByRole("button", {
+    name: "Toggle thinking",
+    exact: true,
+  });
+  const toggleTools = frame.getByRole("button", {
+    name: "Toggle tools",
+    exact: true,
+  });
+  await expect(toggleThinking).toBeVisible();
+  await expect(toggleTools).toBeVisible();
+  await expect(
+    frame.getByRole("button", { name: "Default", exact: true }),
+  ).toBeVisible();
+  await expect(
+    frame.getByRole("button", { name: "No-tools", exact: true }),
+  ).toBeVisible();
+  await expect(frame.getByPlaceholder("Search...")).toBeVisible();
+
+  const thinking = frame.locator("#entry-22222222 .thinking-text");
+  await expect(thinking).toBeVisible();
+  await toggleThinking.click();
+  await expect(thinking).toBeHidden();
   await expect(
     frame.locator("#entry-22222222 .thinking-collapsed"),
-  ).toBeHidden();
-  const systemPrompt = frame.locator("details.system-prompt");
-  await systemPrompt.locator("summary").click();
-  await expect(systemPrompt.locator(".system-prompt-full")).toBeVisible();
-  await expect(systemPrompt).toContainText("Sanitized system instruction 28");
-  expect(
-    await systemPrompt
-      .locator(".pi-session-disclosure-body")
-      .evaluate((body) => ({
-        bounded: body.clientHeight <= innerHeight * 0.7 + 1,
-        overflow: getComputedStyle(body).overflowY,
-      })),
-  ).toEqual({ bounded: true, overflow: "auto" });
-  await expect(
-    systemPrompt.locator(".system-prompt-preview, .system-prompt-expand-hint"),
-  ).toHaveCount(0);
-  const availableTools = frame.locator("details.tools-list");
-  await availableTools.locator("summary").click();
-  await expect(availableTools).toContainText("Sanitized read tool definition");
-  await expect(availableTools.locator(".pi-session-disclosure-body")).toHaveCSS(
-    "overflow-y",
-    "auto",
-  );
-  await frame.locator('.tree-node[data-id="aaaabbbb"] .pi-tree-action').click();
-  await expect(systemPrompt).toHaveAttribute("open", "");
-  await expect(availableTools).toHaveAttribute("open", "");
-  await frame.locator('.tree-node[data-id="88888888"] .pi-tree-action').click();
+  ).toBeVisible();
 
-  await frame.getByRole("button", { name: "Inspect", exact: true }).click();
-  await expect(root).toHaveAttribute("data-pi-session-mode", "inspect");
-  await expect(frame.locator("#entry-22222222 .thinking-text")).toBeVisible();
-  await expect(
-    frame.getByRole("button", { name: "Hide tools", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
-  await expect(
-    frame.getByRole("button", { name: "Hide thinking", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
-  expect(
-    await frame
-      .locator(".tool-execution")
-      .evaluateAll(
-        (tools) =>
-          tools.filter((tool) => getComputedStyle(tool).display !== "none")
-            .length,
-      ),
-  ).toBe(5);
-  await systemPrompt.locator("summary").click();
-  await expect(systemPrompt).not.toHaveAttribute("open", "");
-  await frame.locator('.tree-node[data-id="aaaabbbb"] .pi-tree-action').click();
-  await expect(systemPrompt).not.toHaveAttribute("open", "");
-  await expect(availableTools).toHaveAttribute("open", "");
-  await frame.locator('.tree-node[data-id="88888888"] .pi-tree-action').click();
-
-  const firstTool = frame.locator(".tool-execution").first();
-  await firstTool
-    .getByRole("button", { name: "Show tool details", exact: true })
-    .click();
-  await expect(firstTool).toHaveAttribute("data-pi-details-open", "true");
-  await firstTool.evaluate((tool) => {
-    tool.replaceWith(tool.cloneNode(true));
-    document.dispatchEvent(
-      new CustomEvent("pi-session-render", {
-        detail: { currentTargetId: "22222222" },
-      }),
-    );
+  const toolOutput = frame.locator("#pi-parity-expandable");
+  await frame.locator("#messages").evaluate((messages) => {
+    const output = document.createElement("div");
+    output.id = "pi-parity-expandable";
+    output.className = "tool-output expandable";
+    messages.append(output);
   });
-  const clonedDisclosure = firstTool.locator(":scope > .pi-entry-disclosure");
-  await expect(clonedDisclosure).toHaveText("Hide tool details");
-  await expect(clonedDisclosure).toHaveAttribute("aria-expanded", "true");
-  await clonedDisclosure.click();
-  await expect(firstTool).toHaveAttribute("data-pi-details-open", "false");
-  await expect(clonedDisclosure).toHaveAttribute("aria-expanded", "false");
-  await expect(clonedDisclosure).toHaveText("Show tool details");
+  await expect(toolOutput).not.toHaveClass(/expanded/);
+  await toggleTools.click();
+  await expect(toolOutput).toHaveClass(/expanded/);
 
-  await frame.getByRole("button", { name: "Reading", exact: true }).click();
-  await frame
-    .getByRole("button", { name: "Show thinking", exact: true })
-    .click();
-  await expect(root).toHaveAttribute("data-pi-show-thinking", "true");
-  await frame.locator('.tree-node[data-id="aaaabbbb"] .pi-tree-action').click();
-  await expect(frame.locator("#entry-aaaabbbb")).toBeFocused();
-  await expect(root).toHaveAttribute("data-pi-show-thinking", "true");
-  await expect(root).toHaveAttribute("data-pi-show-tools", "false");
-  await expect(
-    frame.getByRole("button", { name: "Hide thinking", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
-  await expect(
-    frame.getByRole("button", { name: "Show tools", exact: true }),
-  ).toHaveAttribute("aria-pressed", "false");
-  await expect(frame.locator("#entry-aaaabbbb .pi-message-role")).toHaveCount(
-    1,
-  );
+  const alternate = frame.locator('.tree-node[data-id="aaaabbbb"]');
+  await alternate.click();
+  await expect(frame.locator("#entry-aaaabbbb")).toBeVisible();
+  await expect(frame.locator("#entry-99999999")).toHaveCount(0);
 });

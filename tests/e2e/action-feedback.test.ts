@@ -71,9 +71,7 @@ test("diagram feedback is visible, ordered, detailed, and retains focus", async 
   );
 });
 
-test("message-link feedback reports fallback success and failure visibly", async ({
-  page,
-}) => {
+test("message links retain Pi's original copy feedback", async ({ page }) => {
   await mockGist(page, await createExportFixture());
   await page.goto(`/session/#${DARK_GIST_ID}`);
   const frame = page.frameLocator("#preview");
@@ -88,21 +86,32 @@ test("message-link feedback reports fallback success and failure visibly", async
         writeText: () => Promise.reject(new Error("permission denied")),
       },
     });
-    document.execCommand = () => true;
+    document.execCommand = () => {
+      (window as Window & { copyFallbackUsed?: boolean }).copyFallbackUsed =
+        true;
+      return true;
+    };
   });
   await button.focus();
   await button.click();
-  await expect(entry.locator(":scope > .pi-action-status")).toHaveText(
-    "Link copied using browser fallback",
-  );
-  await expect(button).toBeFocused();
-
+  await expect
+    .poll(() =>
+      frame
+        .locator("body")
+        .evaluate(() =>
+          Boolean(
+            (window as Window & { copyFallbackUsed?: boolean })
+              .copyFallbackUsed,
+          ),
+        ),
+    )
+    .toBe(true);
+  await expect(entry.locator(":scope > .pi-action-status")).toHaveCount(0);
+  await expect(button).not.toHaveClass(/copied/, { timeout: 2_000 });
   await frame.locator("body").evaluate(() => {
     document.execCommand = () => false;
   });
   await button.click();
-  await expect(entry.locator(":scope > .pi-action-status")).toContainText(
-    "permission denied",
-  );
-  await expect(entry.locator(":scope > .pi-action-status")).toHaveCount(1);
+  await expect(button).not.toHaveClass(/copied/);
+  await expect(button.locator("svg")).toHaveCount(1);
 });

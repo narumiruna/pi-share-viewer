@@ -1,3 +1,5 @@
+export const PI_EXPORT_VERSION = "0.85.0";
+
 // This is a compatibility seam, not a JavaScript rewriter. All four exact
 // Pi 0.85.0 call sites and the parser definition must match before any change.
 const ARGUMENTS = [

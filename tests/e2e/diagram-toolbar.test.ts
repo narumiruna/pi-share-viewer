@@ -88,9 +88,12 @@ for (const width of [320, 640, 1440]) {
     await expect(more).toBeFocused();
     await more.click();
     await expect(secondary).toBeVisible();
-    const reading = frame.getByRole("button", { name: "Reading", exact: true });
-    await reading.click();
-    await expect(reading).toBeFocused();
+    const sessionControl = frame.getByRole("button", {
+      name: "Toggle thinking",
+      exact: true,
+    });
+    await sessionControl.click();
+    await expect(sessionControl).toBeFocused();
     await expect(secondary).toBeHidden();
     await expect(more).toHaveAttribute("aria-expanded", "false");
     await more.click();
@@ -186,7 +189,7 @@ test("More actions remain reachable in fallback fullscreen", async ({
   await card.getByRole("button", { name: "Zoom out" }).focus();
   await card.getByRole("button", { name: "Zoom out" }).press("Escape");
   await expect(card).not.toHaveClass(/pi-mermaid-expanded/);
-  await expect(sidebar).toHaveJSProperty("inert", true);
+  await expect(sidebar).toHaveJSProperty("inert", false);
   await page.screenshot({
     path: "test-results/diagram-toolbar-fullscreen.png",
   });

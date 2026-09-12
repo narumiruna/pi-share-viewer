@@ -145,8 +145,8 @@ test("formula source controls copy exact original expressions and preserve seman
   await frame.getByRole("button", { name: "Switch to light theme" }).click();
   await expect(frame.locator(".pi-math-shell")).toHaveCount(7);
   await page.setViewportSize({ width: 1000, height: 844 });
-  await frame.locator('.tree-node[data-id="aaaabbbb"] .pi-tree-action').click();
-  await frame.locator('.tree-node[data-id="88888888"] .pi-tree-action').click();
+  await frame.locator('.tree-node[data-id="aaaabbbb"]').click();
+  await frame.locator('.tree-node[data-id="88888888"]').click();
   await expect(frame.locator(".pi-math-shell")).toHaveCount(7);
   await expect(frame.locator(".pi-math-shell .pi-math-shell")).toHaveCount(0);
   await expect(frame.locator(".pi-math .pi-math-source-button")).toHaveCount(0);
@@ -164,9 +164,7 @@ test("formula Escape does not trigger session navigation", async ({ page }) => {
   const shell = frame.locator(".pi-math-shell").first();
   const sourceButton = shell.getByRole("button", { name: "Formula source" });
   await sourceButton.click();
-  const search = frame.getByRole("textbox", {
-    name: "Search session navigation",
-  });
+  const search = frame.getByPlaceholder("Search...");
   await search.evaluate((input: HTMLInputElement) => {
     input.value = "NEBULA-ANCHOR";
     input.dispatchEvent(new Event("input", { bubbles: true }));

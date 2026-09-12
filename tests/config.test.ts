@@ -94,7 +94,8 @@ describe("repository shape", () => {
 
   test("keeps the base bootstrap independent from optional rendering payloads", () => {
     const bootstrap = readFileSync("src/session-bootstrap.ts", "utf8");
-    expect(bootstrap).toContain("installSessionUi");
+    expect(bootstrap).toContain("installSessionStyle");
+    expect(bootstrap).not.toContain("installSessionUi");
     expect(bootstrap).toContain("createMathParser");
     expect(bootstrap).not.toMatch(/from ["'](?:katex|react|react-dom|mermaid)/);
     expect(bootstrap).not.toContain("MathRenderer");

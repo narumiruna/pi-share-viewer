@@ -50,7 +50,7 @@ test("renders base text while optional assets are held, then enhances in place",
     body.dataset.baseNodeIdentity = "preserve-me";
   });
   await frame
-    .getByRole("button", { name: "Show thinking", exact: true })
+    .getByRole("button", { name: "Toggle thinking", exact: true })
     .click();
 
   releaseEnhancer?.();
@@ -73,10 +73,7 @@ test("renders base text while optional assets are held, then enhances in place",
     "data-base-node-identity",
     "preserve-me",
   );
-  await expect(frame.locator("html")).toHaveAttribute(
-    "data-pi-show-thinking",
-    "true",
-  );
+  await expect(frame.locator("#entry-22222222 .thinking-text")).toBeHidden();
   await expect(frame.locator(".pi-mermaid-card")).toHaveCount(2);
   await expect(page.locator("#enhancement-status")).toBeHidden();
 });
@@ -109,16 +106,14 @@ test("renderer failure leaves math readable and retry preserves viewer state", a
     "waiting-runtime",
   );
   await expect(card.locator(".pi-mermaid-source")).toBeVisible();
-  const alternate = frame.locator(
-    '.tree-node[data-id="aaaabbbb"] .pi-tree-action',
-  );
+  const alternate = frame.locator('.tree-node[data-id="aaaabbbb"]');
   await alternate.click();
-  await expect(frame.locator("#entry-aaaabbbb")).toBeFocused();
+  await expect(frame.locator("#entry-aaaabbbb")).toBeVisible();
   await expect(frame.locator("#entry-99999999")).toHaveCount(0);
-  await expect(alternate).toHaveAttribute("aria-selected", "true");
+  await expect(alternate).toHaveClass(/active/);
   await frame.getByRole("button", { name: "Switch to light theme" }).click();
   await frame
-    .getByRole("button", { name: "Show thinking", exact: true })
+    .getByRole("button", { name: "Toggle thinking", exact: true })
     .click();
   const scrollBefore = await frame
     .locator("html")
@@ -134,7 +129,7 @@ test("renderer failure leaves math readable and retry preserves viewer state", a
   });
   await expect(frame.locator("#entry-aaaabbbb")).toBeVisible();
   await expect(frame.locator("#entry-99999999")).toHaveCount(0);
-  await expect(alternate).toHaveAttribute("aria-selected", "true");
+  await expect(alternate).toHaveClass(/active/);
   await expect(frame.locator("body")).toHaveAttribute(
     "data-retry-identity",
     "same-frame",
@@ -143,10 +138,7 @@ test("renderer failure leaves math readable and retry preserves viewer state", a
     "data-pi-mermaid-theme",
     "light",
   );
-  await expect(frame.locator("html")).toHaveAttribute(
-    "data-pi-show-thinking",
-    "true",
-  );
+  await expect(frame.locator("#entry-aaaabbbb .thinking-text")).toBeHidden();
   expect(
     await frame.locator("html").evaluate((element) => element.scrollTop),
   ).toBe(scrollBefore);

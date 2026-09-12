@@ -1,6 +1,6 @@
 import { createMathParser, type PiMarkdownParser } from "./math-source.js";
 import { isMermaidRendererReady } from "./mermaid-render-protocol.js";
-import { installSessionUi } from "./session-ui.js";
+import { installSessionStyle } from "./session-style.js";
 
 const MAX_RUNTIME_BYTES = 8 * 1024 * 1024;
 const RENDERER_PROBE_TIMEOUT_MS = 5_000;
@@ -34,7 +34,7 @@ const loadId =
   document.querySelector<HTMLMetaElement>('meta[name="pi-load-id"]')?.content ??
   "";
 const compatible =
-  document.querySelector<HTMLMetaElement>('meta[name="pi-session-compat"]')
+  document.querySelector<HTMLMetaElement>('meta[name="pi-math-compat"]')
     ?.content === "0.85.0";
 const configuredTheme = document.querySelector<HTMLMetaElement>(
   'meta[name="pi-viewer-theme"]',
@@ -65,7 +65,7 @@ if (compatible) {
       writable: false,
     });
   }
-  installSessionUi();
+  installSessionStyle();
 }
 
 function escapeInlineScript(source: string): string {
