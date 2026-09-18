@@ -1,4 +1,3 @@
-import { MAX_SESSION_HTML_BYTES } from "./gist.js";
 import { PI_EXPORT_VERSION, prepareMathHook } from "./math-inject.js";
 import type { SiteTheme } from "./theme.js";
 
@@ -37,9 +36,6 @@ export function injectSessionViewer(
   urlParams = "",
   diagramId = "",
 ): string {
-  if (byteLength(sessionHtml) > MAX_SESSION_HTML_BYTES) {
-    throw new Error("Session is too large to display safely.");
-  }
   if (byteLength(bootstrapSource) > MAX_BOOTSTRAP_BYTES) {
     throw new Error("Session bootstrap is unexpectedly large.");
   }

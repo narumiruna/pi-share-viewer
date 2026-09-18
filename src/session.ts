@@ -9,7 +9,6 @@ import {
 } from "./theme.js";
 import { renderError } from "./ui.js";
 
-const LOAD_TIMEOUT_MS = 30_000;
 const BOOTSTRAP_READY_TIMEOUT_MS = 5_000;
 const RUNTIME_TIMEOUT_MS = 10_000;
 const MAX_RUNTIME_SOURCE_BYTES = 8 * 1024 * 1024;
@@ -237,8 +236,6 @@ export async function loadViewer(): Promise<void> {
   frame.hidden = true;
   frame.removeAttribute("srcdoc");
 
-  const timer = window.setTimeout(() => controller.abort(), LOAD_TIMEOUT_MS);
-
   try {
     const { diagramId, gistId, urlParams } = parseSessionHash(
       window.location.hash,
@@ -298,13 +295,9 @@ export async function loadViewer(): Promise<void> {
     if (sequence !== loadSequence) return;
     loading.hidden = true;
     errorPanel.hidden = false;
-    const failure = controller.signal.aborted
-      ? new Error("Session load timed out.")
-      : error;
-    errorRetry.hidden = !retryableSessionError(failure);
-    renderError(errorMessage, failure);
+    errorRetry.hidden = !retryableSessionError(error);
+    renderError(errorMessage, error);
   } finally {
-    window.clearTimeout(timer);
     if (activeController === controller) activeController = undefined;
   }
 }

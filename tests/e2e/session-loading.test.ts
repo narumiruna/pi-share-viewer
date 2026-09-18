@@ -1,5 +1,4 @@
 import { expect, test } from "@playwright/test";
-import { MAX_SESSION_HTML_BYTES } from "../../src/gist.js";
 import {
   createReviewExportFixture,
   DARK_GIST_ID,
@@ -400,9 +399,7 @@ test("bootstrap failures and missing readiness stay retryable", async ({
   ).toHaveCount(6, { timeout: 15_000 });
 });
 
-test("transient session failures retry, terminal exports never enter the iframe", async ({
-  page,
-}) => {
+test("transient session failures remain retryable", async ({ page }) => {
   const html = replaceSessionText(
     await createReviewExportFixture(),
     "Review the session viewer reading workflow.",
@@ -440,25 +437,6 @@ test("transient session failures retry, terminal exports never enter the iframe"
       .locator("#entry-11111111")
       .getByText(/Recovered session/),
   ).toBeVisible();
-
-  await page.route("https://api.github.com/gists/**", (route) =>
-    route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({
-        files: {
-          "session.html": {
-            type: "text/html",
-            size: MAX_SESSION_HTML_BYTES + 1,
-            truncated: false,
-            content: "small",
-          },
-        },
-      }),
-    }),
-  );
-  await page.goto(`/session/#${LIGHT_GIST_ID}`);
-  await expect(page.locator("#error-message")).toContainText("too large");
-  await expect(page.locator("#preview")).not.toHaveAttribute("srcdoc", /.*/);
 });
 
 test("stale retry and unexpected child messages cannot affect a newer load", async ({

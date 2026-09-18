@@ -1,9 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import {
-  GistLoadError,
-  loadSessionHtml,
-  MAX_SESSION_HTML_BYTES,
-} from "../src/gist.js";
+import { loadSessionHtml } from "../src/gist.js";
 import { parseGistId, parseSessionHash } from "../src/hash.js";
 
 const GIST_ID = "2b736fe885c106e7ee125d52b1cfecbb";
@@ -309,33 +305,20 @@ describe("Gist loader", () => {
     ).rejects.toThrow("failed (500)");
   });
 
-  test("rejects oversized metadata and file declarations", async () => {
+  test("accepts large declared sizes and rejects malformed file fields", async () => {
     const declared = vi.fn(async () =>
       jsonResponse({
         files: {
           "session.html": {
             type: "text/html",
-            size: MAX_SESSION_HTML_BYTES + 1,
+            size: Number.MAX_SAFE_INTEGER,
             content: "small",
           },
         },
       }),
     );
-    await expect(
-      loadSessionHtml(GIST_ID, { fetch: declared }),
-    ).rejects.toBeInstanceOf(GistLoadError);
-
-    const metadata = vi.fn(
-      async () =>
-        new Response("{}", {
-          headers: {
-            "content-length": String(17 * 1024 * 1024),
-            "content-type": "application/json",
-          },
-        }),
-    );
-    await expect(loadSessionHtml(GIST_ID, { fetch: metadata })).rejects.toThrow(
-      "too large",
+    await expect(loadSessionHtml(GIST_ID, { fetch: declared })).resolves.toBe(
+      "small",
     );
 
     const malformedFields = vi.fn(async () =>
@@ -355,29 +338,15 @@ describe("Gist loader", () => {
     ).rejects.toThrow("malformed session metadata");
   });
 
-  test("rejects oversized inline and streamed raw content", async () => {
-    const oversizedInline = vi.fn(async () =>
-      jsonResponse({
-        files: {
-          "session.html": {
-            type: "text/html",
-            truncated: false,
-            content: "x".repeat(MAX_SESSION_HTML_BYTES + 1),
-          },
-        },
-      }),
-    );
-    await expect(
-      loadSessionHtml(GIST_ID, { fetch: oversizedInline }),
-    ).rejects.toThrow("too large");
-
-    const oversizedRaw = vi
+  test("streams raw content without a local byte limit", async () => {
+    const fetcher = vi
       .fn<typeof fetch>()
       .mockResolvedValueOnce(
         jsonResponse({
           files: {
             "session.html": {
               type: "text/html",
+              size: Number.MAX_SAFE_INTEGER,
               truncated: true,
               raw_url: `https://gist.githubusercontent.com/owner/${GIST_ID}/raw/rev/session.html`,
             },
@@ -385,14 +354,15 @@ describe("Gist loader", () => {
         }),
       )
       .mockResolvedValueOnce(
-        new Response("small body", {
+        new Response("raw session", {
           headers: {
-            "content-length": String(MAX_SESSION_HTML_BYTES + 1),
+            "content-length": String(Number.MAX_SAFE_INTEGER),
           },
         }),
       );
-    await expect(
-      loadSessionHtml(GIST_ID, { fetch: oversizedRaw }),
-    ).rejects.toThrow("too large");
+
+    await expect(loadSessionHtml(GIST_ID, { fetch: fetcher })).resolves.toBe(
+      "raw session",
+    );
   });
 });

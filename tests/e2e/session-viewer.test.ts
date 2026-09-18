@@ -1,5 +1,4 @@
 import { expect, test } from "@playwright/test";
-import { MAX_SESSION_HTML_BYTES } from "../../src/gist.js";
 import {
   createExportFixture,
   DARK_GIST_ID,
@@ -941,9 +940,10 @@ test("keeps a stale hash request from replacing the latest session", async ({
   ).toHaveCount(0);
 });
 
-test("rejects oversized content before it enters the iframe", async ({
+test("does not reject a session based on its declared size", async ({
   page,
 }) => {
+  const html = await createExportFixture();
   await page.route("https://api.github.com/gists/**", async (route) => {
     await route.fulfill({
       contentType: "application/json",
@@ -951,9 +951,9 @@ test("rejects oversized content before it enters the iframe", async ({
         files: {
           "session.html": {
             type: "text/html",
-            size: MAX_SESSION_HTML_BYTES + 1,
+            size: Number.MAX_SAFE_INTEGER,
             truncated: false,
-            content: "small",
+            content: html,
           },
         },
       }),
@@ -961,9 +961,10 @@ test("rejects oversized content before it enters the iframe", async ({
   });
   await page.goto(`/session/#${DARK_GIST_ID}`);
 
-  await expect(page.locator("#error-message")).toContainText("too large");
-  await expect(page.locator("#preview")).toBeHidden();
-  await expect(page.locator("#preview")).not.toHaveAttribute("srcdoc", /.*/);
+  await expect(
+    page.frameLocator("#preview").locator("#entry-a1b2c3d4"),
+  ).toBeVisible();
+  await expect(page.locator("#error")).toBeHidden();
 });
 
 test("shows malformed remote data as text", async ({ page }) => {

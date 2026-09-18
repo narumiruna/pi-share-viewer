@@ -1,6 +1,4 @@
 export const SESSION_FILENAME = "session.html";
-export const MAX_SESSION_HTML_BYTES = 12 * 1024 * 1024;
-const MAX_GIST_API_BYTES = 16 * 1024 * 1024;
 const GIST_API_ORIGIN = "https://api.github.com";
 const RAW_GIST_HOST = "gist.githubusercontent.com";
 
@@ -21,9 +19,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-async function readTextWithLimit(
+async function readText(
   response: Response,
-  maxBytes: number,
   onProgress?: (progress: SessionLoadProgress) => void,
   fallbackTotalBytes?: number,
 ): Promise<string> {
@@ -36,9 +33,6 @@ async function readTextWithLimit(
     parsedContentLength >= 0
       ? parsedContentLength
       : undefined;
-  if (contentLength !== undefined && contentLength > maxBytes) {
-    throw new GistLoadError("Session is too large to display safely.");
-  }
   const totalBytes = fallbackTotalBytes ?? contentLength;
   const reportProgress = (loadedBytes: number) =>
     onProgress?.({
@@ -49,11 +43,7 @@ async function readTextWithLimit(
 
   if (!response.body) {
     const text = await response.text();
-    const loadedBytes = new Blob([text]).size;
-    if (loadedBytes > maxBytes) {
-      throw new GistLoadError("Session is too large to display safely.");
-    }
-    reportProgress(loadedBytes);
+    reportProgress(new Blob([text]).size);
     return text;
   }
 
@@ -67,10 +57,6 @@ async function readTextWithLimit(
       const { done, value } = await reader.read();
       if (done) break;
       loadedBytes += value.byteLength;
-      if (loadedBytes > maxBytes) {
-        await reader.cancel();
-        throw new GistLoadError("Session is too large to display safely.");
-      }
       output += decoder.decode(value, { stream: true });
       reportProgress(loadedBytes);
     }
@@ -172,7 +158,7 @@ export async function loadSessionHtml(
     throw new GistLoadError("GitHub returned unexpected session metadata.");
   }
 
-  const payloadText = await readTextWithLimit(response, MAX_GIST_API_BYTES);
+  const payloadText = await readText(response);
   let parsed: unknown;
   try {
     parsed = JSON.parse(payloadText);
@@ -208,9 +194,6 @@ export async function loadSessionHtml(
   ) {
     throw new GistLoadError("GitHub returned malformed session metadata.");
   }
-  if (typeof file.size === "number" && file.size > MAX_SESSION_HTML_BYTES) {
-    throw new GistLoadError("Session is too large to display safely.");
-  }
   if (file.truncated !== undefined && typeof file.truncated !== "boolean") {
     throw new GistLoadError("GitHub returned malformed session metadata.");
   }
@@ -224,9 +207,8 @@ export async function loadSessionHtml(
     if (rawResponse.url)
       assertRawGistUrl(rawResponse.url, gistId.toLowerCase());
     if (!rawResponse.ok) throw explainHttpError(rawResponse);
-    return readTextWithLimit(
+    return readText(
       rawResponse,
-      MAX_SESSION_HTML_BYTES,
       options.onProgress,
       typeof file.size === "number" ? file.size : undefined,
     );
@@ -234,9 +216,6 @@ export async function loadSessionHtml(
 
   if (typeof file.content !== "string") {
     throw new GistLoadError("GitHub did not return the session content.");
-  }
-  if (new Blob([file.content]).size > MAX_SESSION_HTML_BYTES) {
-    throw new GistLoadError("Session is too large to display safely.");
   }
   return file.content;
 }
