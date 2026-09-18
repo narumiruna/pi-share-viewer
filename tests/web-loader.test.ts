@@ -101,7 +101,16 @@ describe("Gist loader", () => {
     );
   });
 
-  test("loads truncated content from the allowed raw host", async () => {
+  test("loads truncated content and reports streamed raw progress", async () => {
+    const chunks = ["<!doctype html>", "<p>raw</p>"];
+    const encodedChunks = chunks.map((chunk) =>
+      new TextEncoder().encode(chunk),
+    );
+    const rawSize = encodedChunks.reduce(
+      (total, chunk) => total + chunk.byteLength,
+      0,
+    );
+    const progress = vi.fn();
     const fetcher = vi
       .fn<typeof fetch>()
       .mockResolvedValueOnce(
@@ -109,23 +118,37 @@ describe("Gist loader", () => {
           files: {
             "session.html": {
               type: "text/html",
-              size: 100,
+              size: rawSize,
               truncated: true,
               raw_url: `https://gist.githubusercontent.com/owner/${GIST_ID}/raw/rev/session.html`,
             },
           },
         }),
       )
-      .mockResolvedValueOnce(new Response("<!doctype html><p>raw</p>"));
+      .mockResolvedValueOnce(
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              for (const chunk of encodedChunks) controller.enqueue(chunk);
+              controller.close();
+            },
+          }),
+        ),
+      );
 
     await expect(
-      loadSessionHtml(GIST_ID, { fetch: fetcher }),
+      loadSessionHtml(GIST_ID, { fetch: fetcher, onProgress: progress }),
     ).resolves.toContain("raw");
     expect(fetcher.mock.calls[1]?.[0]).toEqual(
       new URL(
         `https://gist.githubusercontent.com/owner/${GIST_ID}/raw/rev/session.html`,
       ),
     );
+    expect(progress.mock.calls.map(([value]) => value)).toEqual([
+      { loadedBytes: 0, totalBytes: rawSize },
+      { loadedBytes: encodedChunks[0].byteLength, totalBytes: rawSize },
+      { loadedBytes: rawSize, totalBytes: rawSize },
+    ]);
   });
 
   test.each([

@@ -78,6 +78,42 @@ test("renders base text while optional assets are held, then enhances in place",
   await expect(page.locator("#enhancement-status")).toBeHidden();
 });
 
+test("shows raw session download progress in the loading status", async ({
+  page,
+}) => {
+  const html = await createReviewExportFixture();
+  const rawUrl = `https://gist.githubusercontent.com/owner/${DARK_GIST_ID}/raw/rev/session.html`;
+  await page.route("https://api.github.com/gists/**", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        files: {
+          "session.html": {
+            type: "text/html",
+            size: Buffer.byteLength(html),
+            truncated: true,
+            raw_url: rawUrl,
+          },
+        },
+      }),
+    }),
+  );
+  await page.route(rawUrl, (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: html,
+    }),
+  );
+
+  await page.goto(`/session/#${DARK_GIST_ID}`);
+  await expect(
+    page.frameLocator("#preview").locator("#entry-11111111"),
+  ).toBeVisible();
+  await expect(page.locator("#loading-message")).toHaveText(
+    "Downloading Pi session… 100%",
+  );
+});
+
 test("renderer failure leaves math readable and retry preserves viewer state", async ({
   page,
 }) => {

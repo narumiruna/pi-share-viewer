@@ -6,6 +6,17 @@ const RAW_GIST_HOST = "gist.githubusercontent.com";
 
 export class GistLoadError extends Error {}
 
+export interface SessionLoadProgress {
+  loadedBytes: number;
+  totalBytes?: number;
+}
+
+interface SessionLoadOptions {
+  fetch?: typeof fetch;
+  onProgress?: (progress: SessionLoadProgress) => void;
+  signal?: AbortSignal;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -13,35 +24,55 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 async function readTextWithLimit(
   response: Response,
   maxBytes: number,
+  onProgress?: (progress: SessionLoadProgress) => void,
+  fallbackTotalBytes?: number,
 ): Promise<string> {
-  const contentLength = Number(response.headers.get("content-length"));
-  if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+  const contentLengthHeader = response.headers.get("content-length");
+  const parsedContentLength =
+    contentLengthHeader === null ? undefined : Number(contentLengthHeader);
+  const contentLength =
+    parsedContentLength !== undefined &&
+    Number.isFinite(parsedContentLength) &&
+    parsedContentLength >= 0
+      ? parsedContentLength
+      : undefined;
+  if (contentLength !== undefined && contentLength > maxBytes) {
     throw new GistLoadError("Session is too large to display safely.");
   }
+  const totalBytes = fallbackTotalBytes ?? contentLength;
+  const reportProgress = (loadedBytes: number) =>
+    onProgress?.({
+      loadedBytes,
+      ...(totalBytes !== undefined ? { totalBytes } : {}),
+    });
+  reportProgress(0);
 
   if (!response.body) {
     const text = await response.text();
-    if (new Blob([text]).size > maxBytes) {
+    const loadedBytes = new Blob([text]).size;
+    if (loadedBytes > maxBytes) {
       throw new GistLoadError("Session is too large to display safely.");
     }
+    reportProgress(loadedBytes);
     return text;
   }
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
-  let totalBytes = 0;
+  let loadedBytes = 0;
   let output = "";
 
   try {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      totalBytes += value.byteLength;
-      if (totalBytes > maxBytes) {
+      loadedBytes += value.byteLength;
+      if (loadedBytes > maxBytes) {
         await reader.cancel();
         throw new GistLoadError("Session is too large to display safely.");
       }
       output += decoder.decode(value, { stream: true });
+      reportProgress(loadedBytes);
     }
     output += decoder.decode();
     return output;
@@ -121,7 +152,7 @@ async function request(
 
 export async function loadSessionHtml(
   gistId: string,
-  options: { fetch?: typeof fetch; signal?: AbortSignal } = {},
+  options: SessionLoadOptions = {},
 ): Promise<string> {
   if (!/^[0-9a-f]{32}$/i.test(gistId)) {
     throw new GistLoadError("Invalid Gist ID.");
@@ -193,7 +224,12 @@ export async function loadSessionHtml(
     if (rawResponse.url)
       assertRawGistUrl(rawResponse.url, gistId.toLowerCase());
     if (!rawResponse.ok) throw explainHttpError(rawResponse);
-    return readTextWithLimit(rawResponse, MAX_SESSION_HTML_BYTES);
+    return readTextWithLimit(
+      rawResponse,
+      MAX_SESSION_HTML_BYTES,
+      options.onProgress,
+      typeof file.size === "number" ? file.size : undefined,
+    );
   }
 
   if (typeof file.content !== "string") {
