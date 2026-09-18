@@ -51,5 +51,5 @@ HTML entries are in `src/index.html` and `src/session/index.html`; static assets
 
 - Untrusted sessions run in a sandboxed iframe with network requests blocked. The parent fetches Gists through GitHub's unauthenticated API and is subject to its rate limits.
 - Mermaid and KaTeX assets are bundled; diagrams, math, and SVG/PNG exports use no rendering service.
-- Sessions are limited to 12 MiB and 50 Mermaid diagrams, with 100,000 source bytes and a five-second render deadline per diagram. Invalid diagrams or formulas retain their source.
+- Session loading has no viewer-defined file-size or elapsed-time limit; GitHub's Gist and API behavior remains the upstream boundary. Mermaid output is limited to 50 diagrams, with 100,000 source bytes and a five-second render deadline per diagram. Invalid diagrams or formulas retain their source.
 - No backend, OAuth, or Gist management is included. Delete shared content with `gh gist delete <gist-id>`.
