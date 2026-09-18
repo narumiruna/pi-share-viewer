@@ -1,4 +1,4 @@
-import { loadSessionHtml } from "./gist.js";
+import { loadSessionHtml, type SessionLoadProgress } from "./gist.js";
 import { parseSessionHash } from "./hash.js";
 import { injectSessionViewer } from "./inject.js";
 import {
@@ -13,6 +13,7 @@ const LOAD_TIMEOUT_MS = 30_000;
 const BOOTSTRAP_READY_TIMEOUT_MS = 5_000;
 const RUNTIME_TIMEOUT_MS = 10_000;
 const MAX_RUNTIME_SOURCE_BYTES = 8 * 1024 * 1024;
+const INITIAL_LOADING_MESSAGE = "Loading Pi session…";
 type RuntimeKind = "enhancer" | "renderer";
 type RuntimeAsset = "bootstrap" | RuntimeKind;
 
@@ -38,6 +39,17 @@ function requiredElement<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
   if (!element) throw new Error(`Missing required element: ${id}`);
   return element as T;
+}
+
+function formatSessionLoadProgress(progress: SessionLoadProgress): string {
+  if (progress.totalBytes !== undefined && progress.totalBytes > 0) {
+    const percentage = Math.min(
+      100,
+      Math.floor((progress.loadedBytes / progress.totalBytes) * 100),
+    );
+    return `Downloading Pi session… ${percentage}%`;
+  }
+  return `Downloading Pi session… ${Math.ceil(progress.loadedBytes / 1024)} KiB`;
 }
 
 function runtimeUrl(kind: RuntimeAsset): URL {
@@ -210,6 +222,7 @@ export async function loadViewer(): Promise<void> {
   const sequence = ++loadSequence;
 
   const loading = requiredElement<HTMLElement>("loading");
+  const loadingMessage = requiredElement<HTMLElement>("loading-message");
   const errorPanel = requiredElement<HTMLElement>("error");
   const errorMessage = requiredElement<HTMLElement>("error-message");
   const errorRetry = requiredElement<HTMLButtonElement>("error-retry");
@@ -217,6 +230,7 @@ export async function loadViewer(): Promise<void> {
   const frame = requiredElement<HTMLIFrameElement>("preview");
 
   loading.hidden = false;
+  loadingMessage.textContent = INITIAL_LOADING_MESSAGE;
   errorPanel.hidden = true;
   errorRetry.hidden = true;
   enhancementPanel.hidden = true;
@@ -231,7 +245,13 @@ export async function loadViewer(): Promise<void> {
     );
     const viewerBaseUrl = new URL("../", window.location.href);
     const [sessionHtml, bootstrapSource] = await Promise.all([
-      loadSessionHtml(gistId, { signal: controller.signal }),
+      loadSessionHtml(gistId, {
+        onProgress: (progress) => {
+          if (sequence !== loadSequence) return;
+          loadingMessage.textContent = formatSessionLoadProgress(progress);
+        },
+        signal: controller.signal,
+      }),
       loadRuntimeSource("bootstrap", controller.signal),
     ]);
     if (sequence !== loadSequence) return;
