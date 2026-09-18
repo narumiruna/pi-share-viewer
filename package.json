@@ -36,7 +36,7 @@
     "@earendil-works/pi-coding-agent": "0.85.0",
     "@playwright/test": "^1.63.0",
     "@types/katex": "^0.16.8",
-    "@types/node": "^26.5.0",
+    "@types/node": "^26.5.1",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "husky": "^9.1.7",
