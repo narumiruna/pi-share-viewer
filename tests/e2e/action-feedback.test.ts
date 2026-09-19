@@ -14,7 +14,6 @@ test("diagram feedback is visible, ordered, detailed, and retains focus", async 
   const frame = page.frameLocator("#preview");
   await renderEntryDiagrams(frame, 1);
   const card = frame.locator("#a1b2c3d4-diagram-1");
-  await card.getByRole("button", { name: "More diagram actions" }).click();
   await frame.locator("body").evaluate(() => {
     const resolvers: Array<() => void> = [];
     Object.defineProperty(navigator, "clipboard", {

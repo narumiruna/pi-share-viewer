@@ -1,10 +1,7 @@
 import {
   ActivityLogIcon,
-  CheckIcon,
   CodeIcon,
   CopyIcon,
-  CornersIcon,
-  DotsHorizontalIcon,
   DownloadIcon,
   EnterFullScreenIcon,
   ExitFullScreenIcon,
@@ -15,8 +12,8 @@ import {
   MixerHorizontalIcon,
   PlusIcon,
   ResetIcon,
+  SizeIcon,
 } from "@radix-ui/react-icons";
-import * as Toggle from "@radix-ui/react-toggle";
 import * as Toolbar from "@radix-ui/react-toolbar";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import {
@@ -59,13 +56,14 @@ interface DiagramToolbarProps {
 }
 
 interface ControlProps {
-  action: DiagramToolbarAction;
+  controls?: string;
   disabled?: boolean;
   icon: ComponentType;
   label: string;
-  labeled?: boolean;
-  onAction: (action: DiagramToolbarAction) => unknown | Promise<unknown>;
+  onClick: () => unknown | Promise<unknown>;
   onError: (error: unknown) => void;
+  pressed?: boolean;
+  tooltipContainer?: HTMLElement;
 }
 
 export interface DiagramToolbarControls {
@@ -82,38 +80,39 @@ function messageFor(error: unknown): string {
 }
 
 function Control({
-  action,
+  controls,
   disabled = false,
   icon: Icon,
   label,
-  labeled = false,
-  onAction,
+  onClick,
   onError,
+  pressed,
+  tooltipContainer,
 }: ControlProps) {
-  const button = (
-    <Toolbar.Button
-      aria-label={label}
-      className={`pi-mermaid-control${labeled ? " is-labeled" : ""}`}
-      disabled={disabled}
-      onClick={() => {
-        void Promise.resolve(onAction(action)).catch(onError);
-      }}
-    >
-      <Icon />
-      {labeled ? <span>{label}</span> : null}
-    </Toolbar.Button>
-  );
-  if (labeled) return button;
   return (
     <Tooltip.Root>
-      <Tooltip.Trigger asChild>{button}</Tooltip.Trigger>
-      <Tooltip.Portal>
+      <Tooltip.Trigger asChild>
+        <Toolbar.Button
+          aria-controls={controls}
+          aria-label={label}
+          aria-pressed={pressed}
+          className="pi-mermaid-control"
+          disabled={disabled}
+          onClick={() => {
+            void Promise.resolve(onClick()).catch(onError);
+          }}
+        >
+          <Icon />
+        </Toolbar.Button>
+      </Tooltip.Trigger>
+      <Tooltip.Portal container={tooltipContainer}>
         <Tooltip.Content
           className="pi-mermaid-tooltip"
           side="bottom"
           sideOffset={7}
         >
           {label}
+          <Tooltip.Arrow className="pi-mermaid-tooltip-arrow" />
         </Tooltip.Content>
       </Tooltip.Portal>
     </Tooltip.Root>
@@ -132,27 +131,15 @@ function DiagramToolbar({
   const [polished, setPolished] = useState(displayMode === "polished");
   const [tracing, setTracing] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
   const [overview, setOverview] = useState(cameraMode === "overview");
   const [zoom, setZoom] = useState(100);
   const [status, setStatus] = useState("");
   const feedbackSequence = useRef(0);
-  const toolbarRef = useRef<HTMLDivElement>(null);
-  const secondaryRef = useRef<HTMLDivElement>(null);
-  const moreRef = useRef<HTMLButtonElement>(null);
 
   const announce = useCallback((message: string) => {
     feedbackSequence.current += 1;
     setStatus(message);
   }, []);
-
-  useEffect(() => {
-    if (moreOpen) {
-      secondaryRef.current
-        ?.querySelector<HTMLButtonElement>("button:not(:disabled)")
-        ?.focus();
-    }
-  }, [moreOpen]);
 
   useEffect(() => {
     register({
@@ -162,26 +149,6 @@ function DiagramToolbar({
       setZoom,
     });
   }, [announce, register]);
-
-  useEffect(() => {
-    if (!moreOpen) return;
-    const outside = (event: PointerEvent) => {
-      if (toolbarRef.current?.contains(event.target as Node)) return;
-      const interactive =
-        event.target instanceof Element &&
-        event.target.closest(
-          'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])',
-        );
-      setMoreOpen(false);
-      if (!interactive) {
-        requestAnimationFrame(() =>
-          moreRef.current?.focus({ preventScroll: true }),
-        );
-      }
-    };
-    document.addEventListener("pointerdown", outside, true);
-    return () => document.removeEventListener("pointerdown", outside, true);
-  }, [moreOpen]);
 
   useEffect(() => {
     const syncFullscreenState = () => {
@@ -257,201 +224,145 @@ function DiagramToolbar({
   }
 
   const onError = (error: unknown) => announce(messageFor(error));
+  const tooltipContainer = expanded ? fullscreenTarget : undefined;
 
   return (
     <Tooltip.Provider delayDuration={350} skipDelayDuration={150}>
       <Toolbar.Root
-        ref={toolbarRef}
         aria-label="Diagram controls"
         className="pi-mermaid-controls"
         onKeyDown={(event) => {
-          if (event.key !== "Escape") return;
-          if (moreOpen) {
-            event.preventDefault();
-            event.nativeEvent.stopImmediatePropagation();
-            setMoreOpen(false);
-            moreRef.current?.focus();
-          } else if (
-            fullscreenTarget.classList.contains("pi-mermaid-expanded")
+          if (
+            event.key !== "Escape" ||
+            !fullscreenTarget.classList.contains("pi-mermaid-expanded")
           ) {
-            event.preventDefault();
-            event.nativeEvent.stopImmediatePropagation();
-            void toggleFullscreen();
+            return;
           }
+          event.preventDefault();
+          event.nativeEvent.stopImmediatePropagation();
+          void toggleFullscreen();
         }}
       >
         <fieldset
-          aria-label="Diagram view"
+          aria-label="Diagram actions"
           className="pi-mermaid-control-group"
         >
           <Control
-            action="zoom-out"
+            disabled={sourceVisible}
             icon={MinusIcon}
             label="Zoom out"
-            onAction={onAction}
+            onClick={() => onAction("zoom-out")}
             onError={onError}
+            tooltipContainer={tooltipContainer}
           />
           <output aria-label="Current zoom" className="pi-mermaid-zoom">
             {zoom}%
           </output>
           <Control
-            action="zoom-in"
+            disabled={sourceVisible}
             icon={PlusIcon}
             label="Zoom in"
-            onAction={onAction}
+            onClick={() => onAction("zoom-in")}
             onError={onError}
+            tooltipContainer={tooltipContainer}
           />
-          <Toolbar.Button
-            aria-label={overview ? "Use readable view" : "Show overview"}
-            aria-pressed={overview}
-            className="pi-mermaid-control"
-            onClick={() => void toggleCamera()}
-          >
-            <CornersIcon />
-          </Toolbar.Button>
-        </fieldset>
-        <Toolbar.Button
-          aria-label={expanded ? "Close fullscreen" : "Open fullscreen to pan"}
-          className="pi-mermaid-control"
-          onClick={() => void toggleFullscreen()}
-        >
-          {expanded ? <ExitFullScreenIcon /> : <EnterFullScreenIcon />}
-        </Toolbar.Button>
-        <Toolbar.Button
-          ref={moreRef}
-          aria-controls={`${fullscreenTarget.id}-actions`}
-          aria-expanded={moreOpen}
-          aria-label="More diagram actions"
-          className="pi-mermaid-control pi-mermaid-more"
-          onClick={() => setMoreOpen((open) => !open)}
-        >
-          <DotsHorizontalIcon />
-        </Toolbar.Button>
-        <div
-          ref={secondaryRef}
-          id={`${fullscreenTarget.id}-actions`}
-          className={`pi-mermaid-secondary${moreOpen ? " is-open" : ""}`}
-        >
-          <fieldset
-            aria-label="Diagram view"
-            className="pi-mermaid-control-group"
-          >
-            <legend className="pi-mermaid-menu-heading">View</legend>
-            <Toolbar.Button
-              aria-label="Reset to readable view"
-              className="pi-mermaid-control is-labeled"
-              onClick={() => void resetCamera()}
-            >
-              <ResetIcon />
-              <span>Reset to readable view</span>
-            </Toolbar.Button>
-            {polishSupported ? (
-              <Toggle.Root
-                aria-label={
-                  polished ? "Use original style" : "Use polished style"
-                }
-                className="pi-mermaid-control is-labeled"
-                onPressedChange={async (pressed) => {
-                  try {
-                    const active = await onAction("display-mode", pressed);
-                    if (typeof active === "boolean") setPolished(active);
-                  } catch (error) {
-                    onError(error);
-                  }
-                }}
-                pressed={polished}
-              >
-                <MixerHorizontalIcon />
-                <span>
-                  {polished ? "Use original style" : "Use polished style"}
-                </span>
-                {polished ? <CheckIcon className="pi-mermaid-check" /> : null}
-              </Toggle.Root>
-            ) : null}
-            <Toggle.Root
-              aria-label="Trace edges"
-              className="pi-mermaid-control is-labeled"
-              disabled={!polishSupported}
-              onPressedChange={(pressed) => {
-                setTracing(pressed);
-                void Promise.resolve(onAction("trace", pressed)).catch(onError);
+          <Control
+            disabled={sourceVisible}
+            icon={SizeIcon}
+            label={overview ? "Use readable view" : "Fit to screen"}
+            onClick={toggleCamera}
+            onError={onError}
+            pressed={overview}
+            tooltipContainer={tooltipContainer}
+          />
+          <Control
+            disabled={sourceVisible}
+            icon={ResetIcon}
+            label="Reset to readable view"
+            onClick={resetCamera}
+            onError={onError}
+            tooltipContainer={tooltipContainer}
+          />
+          <Control
+            icon={expanded ? ExitFullScreenIcon : EnterFullScreenIcon}
+            label={expanded ? "Exit fullscreen" : "Fullscreen"}
+            onClick={toggleFullscreen}
+            onError={onError}
+            tooltipContainer={tooltipContainer}
+          />
+          <Control
+            controls={`${fullscreenTarget.id}-source`}
+            icon={sourceVisible ? EyeOpenIcon : CodeIcon}
+            label={sourceVisible ? "Show diagram" : "Show source"}
+            onClick={toggleSource}
+            onError={onError}
+            pressed={sourceVisible}
+            tooltipContainer={tooltipContainer}
+          />
+          {polishSupported ? (
+            <Control
+              icon={MixerHorizontalIcon}
+              label={polished ? "Use original style" : "Use polished style"}
+              onClick={async () => {
+                const active = await onAction("display-mode", !polished);
+                if (typeof active === "boolean") setPolished(active);
               }}
-              pressed={tracing}
-            >
-              <ActivityLogIcon />
-              <span>Trace edges</span>
-              {tracing ? <CheckIcon className="pi-mermaid-check" /> : null}
-            </Toggle.Root>
-            <Toolbar.Button
-              aria-controls={`${fullscreenTarget.id}-source`}
-              aria-label={sourceVisible ? "Show diagram" : "Show source"}
-              aria-pressed={sourceVisible}
-              className="pi-mermaid-control is-labeled"
-              onClick={() => void toggleSource()}
-            >
-              {sourceVisible ? <EyeOpenIcon /> : <CodeIcon />}
-              <span>{sourceVisible ? "Show diagram" : "Show source"}</span>
-              {sourceVisible ? (
-                <CheckIcon className="pi-mermaid-check" />
-              ) : null}
-            </Toolbar.Button>
-          </fieldset>
-          <fieldset
-            aria-label="Diagram copy actions"
-            className="pi-mermaid-control-group"
-          >
-            <legend className="pi-mermaid-menu-heading">Copy</legend>
-            <Control
-              action="copy-source"
-              icon={CopyIcon}
-              label="Copy source"
-              labeled
-              onAction={() => runFeedback("copy-source", "Source copied")}
               onError={onError}
+              pressed={polished}
+              tooltipContainer={tooltipContainer}
             />
-            <Control
-              action="copy-link"
-              icon={Link2Icon}
-              label="Copy diagram link"
-              labeled
-              onAction={() => runFeedback("copy-link", "Diagram link copied")}
-              onError={onError}
-            />
-            <Control
-              action="copy-svg"
-              icon={CopyIcon}
-              label="Copy SVG"
-              labeled
-              onAction={() => runFeedback("copy-svg", "SVG copied")}
-              onError={onError}
-            />
-          </fieldset>
-          <fieldset
-            aria-label="Diagram download actions"
-            className="pi-mermaid-control-group"
-          >
-            <legend className="pi-mermaid-menu-heading">Download</legend>
-            <Control
-              action="download-svg"
-              icon={DownloadIcon}
-              label="Download SVG"
-              labeled
-              onAction={() => runFeedback("download-svg", "SVG downloaded")}
-              onError={onError}
-            />
-            <Control
-              action="download-png"
-              icon={ImageIcon}
-              label="Download PNG"
-              labeled
-              onAction={() => runFeedback("download-png", "PNG downloaded")}
-              onError={onError}
-            />
-          </fieldset>
-          <span aria-live="polite" className="pi-mermaid-live" role="status">
-            {status}
-          </span>
-        </div>
+          ) : null}
+          <Control
+            disabled={!polishSupported}
+            icon={ActivityLogIcon}
+            label="Trace edges"
+            onClick={async () => {
+              const active = await onAction("trace", !tracing);
+              if (typeof active === "boolean") setTracing(active);
+            }}
+            onError={onError}
+            pressed={tracing}
+            tooltipContainer={tooltipContainer}
+          />
+          <Control
+            icon={CopyIcon}
+            label="Copy source"
+            onClick={() => runFeedback("copy-source", "Source copied")}
+            onError={onError}
+            tooltipContainer={tooltipContainer}
+          />
+          <Control
+            icon={Link2Icon}
+            label="Copy diagram link"
+            onClick={() => runFeedback("copy-link", "Diagram link copied")}
+            onError={onError}
+            tooltipContainer={tooltipContainer}
+          />
+          <Control
+            icon={CopyIcon}
+            label="Copy SVG"
+            onClick={() => runFeedback("copy-svg", "SVG copied")}
+            onError={onError}
+            tooltipContainer={tooltipContainer}
+          />
+          <Control
+            icon={DownloadIcon}
+            label="Download SVG"
+            onClick={() => runFeedback("download-svg", "SVG downloaded")}
+            onError={onError}
+            tooltipContainer={tooltipContainer}
+          />
+          <Control
+            icon={ImageIcon}
+            label="Download PNG"
+            onClick={() => runFeedback("download-png", "PNG downloaded")}
+            onError={onError}
+            tooltipContainer={tooltipContainer}
+          />
+        </fieldset>
+        <span aria-live="polite" className="pi-mermaid-live" role="status">
+          {status}
+        </span>
       </Toolbar.Root>
     </Tooltip.Provider>
   );

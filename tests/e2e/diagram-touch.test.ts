@@ -52,7 +52,7 @@ test("browser touch scrolls inline diagrams but pans and pinches fullscreen", as
     .getByRole("button", { name: "Use readable view", exact: true })
     .click();
   const fullscreen = card.getByRole("button", {
-    name: "Open fullscreen to pan",
+    name: "Fullscreen",
   });
   await fullscreen.click();
   await expect
@@ -138,7 +138,7 @@ test("fallback fullscreen cleans up cancelled touch pointers", async ({
   await card.evaluate((element) => {
     element.requestFullscreen = () => Promise.reject(new Error("fallback"));
   });
-  await card.getByRole("button", { name: "Open fullscreen to pan" }).click();
+  await card.getByRole("button", { name: "Fullscreen" }).click();
   await expect(card).toHaveClass(/pi-mermaid-expanded/);
   const viewport = card.locator(".pi-mermaid-viewport");
   const stage = card.locator(".pi-mermaid-stage");
