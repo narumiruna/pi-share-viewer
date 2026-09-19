@@ -29,7 +29,6 @@ describe("repository shape", () => {
     expect(packageJson.dependencies).toMatchObject({
       "@radix-ui/colors": expect.any(String),
       "@radix-ui/react-icons": expect.any(String),
-      "@radix-ui/react-toggle": expect.any(String),
       "@radix-ui/react-toolbar": expect.any(String),
       "@radix-ui/react-tooltip": expect.any(String),
       marked: expect.any(String),

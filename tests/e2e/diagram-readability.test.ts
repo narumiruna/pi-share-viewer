@@ -99,11 +99,11 @@ test("switches explicitly between readable and overview cameras", async ({
     .click();
   await expect(card).toHaveAttribute("data-pi-mermaid-camera", "readable");
   await expect(
-    card.getByRole("button", { name: "Show overview", exact: true }),
+    card.getByRole("button", { name: "Fit to screen", exact: true }),
   ).toHaveAttribute("aria-pressed", "false");
 
   await card
-    .getByRole("button", { name: "Show overview", exact: true })
+    .getByRole("button", { name: "Fit to screen", exact: true })
     .click();
   await expect(stage).toHaveAttribute("style", overviewTransform ?? "");
   await expect(card).toHaveAttribute("data-pi-mermaid-camera", "overview");
@@ -136,7 +136,7 @@ test("fullscreen preserves readable sizing, guidance, isolation, and focus", asy
   await card.evaluate((element) => {
     element.requestFullscreen = () => Promise.reject(new Error("fallback"));
   });
-  const opener = card.getByRole("button", { name: "Open fullscreen to pan" });
+  const opener = card.getByRole("button", { name: "Fullscreen" });
   const content = frame.locator("#content");
   const contentState = await content.evaluate((element) => ({
     overflow: element.style.overflow,

@@ -75,7 +75,6 @@ test("loads a real Pi export and enhances Mermaid diagrams", async ({
   await zoomInButton.hover();
   await expect(frame.getByRole("tooltip")).toHaveText("Zoom in");
 
-  await card.getByRole("button", { name: "More diagram actions" }).click();
   const traceButton = card.getByRole("button", { name: "Trace edges" });
   await expect(traceButton).toHaveAttribute("aria-pressed", "false");
   await traceButton.click();
@@ -117,7 +116,6 @@ test("loads a real Pi export and enhances Mermaid diagrams", async ({
   await page.mouse.up();
   expect(await stage.getAttribute("style")).not.toBe(transformBeforePan);
 
-  await card.getByRole("button", { name: "More diagram actions" }).click();
   await card.getByRole("button", { name: "Reset to readable view" }).click();
   await expect(stage).toHaveAttribute("style", /scale\(1\)/);
   await expect(card.getByLabel("Current zoom")).toHaveText("100%");
@@ -165,24 +163,22 @@ test("loads a real Pi export and enhances Mermaid diagrams", async ({
       document.dispatchEvent(new Event("fullscreenchange"));
     };
   });
-  await card.getByRole("button", { name: "Open fullscreen to pan" }).click();
+  await card.getByRole("button", { name: "Fullscreen" }).click();
   await expect(
-    card.getByRole("button", { name: "Close fullscreen" }),
+    card.getByRole("button", { name: "Exit fullscreen" }),
   ).toBeVisible();
   await frame.locator("body").evaluate(() => {
     (
       window as Window & { simulateBrowserFullscreenExit?: () => void }
     ).simulateBrowserFullscreenExit?.();
   });
-  await expect(
-    card.getByRole("button", { name: "Open fullscreen to pan" }),
-  ).toBeVisible();
-  await card.getByRole("button", { name: "Show overview" }).click();
+  await expect(card.getByRole("button", { name: "Fullscreen" })).toBeVisible();
+  await card.getByRole("button", { name: "Fit to screen" }).click();
 
   await card.evaluate((element) => {
     element.requestFullscreen = () => Promise.reject(new Error("denied"));
   });
-  await card.getByRole("button", { name: "Open fullscreen to pan" }).click();
+  await card.getByRole("button", { name: "Fullscreen" }).click();
   await expect(card).toHaveClass(/pi-mermaid-expanded/);
   await expect
     .poll(() =>
@@ -203,12 +199,10 @@ test("loads a real Pi export and enhances Mermaid diagrams", async ({
   await viewport.focus();
   await viewport.press("Escape");
   await expect(card).not.toHaveClass(/pi-mermaid-expanded/);
-  await expect(
-    card.getByRole("button", { name: "Open fullscreen to pan" }),
-  ).toBeVisible();
-  await card.getByRole("button", { name: "Open fullscreen to pan" }).click();
+  await expect(card.getByRole("button", { name: "Fullscreen" })).toBeVisible();
+  await card.getByRole("button", { name: "Fullscreen" }).click();
   await expect(card).toHaveClass(/pi-mermaid-expanded/);
-  await card.getByRole("button", { name: "Close fullscreen" }).click();
+  await card.getByRole("button", { name: "Exit fullscreen" }).click();
   await expect(card).not.toHaveClass(/pi-mermaid-expanded/);
 
   await frame.locator("body").evaluate((body) => {
@@ -246,7 +240,6 @@ test("loads a real Pi export and enhances Mermaid diagrams", async ({
   await expect(card).toHaveAttribute("data-pi-mermaid-render-theme", "light");
   await expect(card).toHaveAttribute("data-pi-mermaid-needs-fit", "true");
   expect(await diagramSvg.evaluate((svg) => svg.outerHTML)).not.toBe(darkSvg);
-  await card.getByRole("button", { name: "More diagram actions" }).click();
   await card.getByRole("button", { name: "Show diagram" }).click();
   await expect(viewport).toBeVisible();
   await expect(card).not.toHaveAttribute("data-pi-mermaid-needs-fit");
@@ -316,7 +309,6 @@ test("supports natural sizing, scroll-safe camera controls, styles, focus, and a
   await expect(viewport).toHaveAttribute("role", "region");
   await expect(svg).toHaveAttribute("role", /graphics-document/);
   await expect(svg.locator("title")).toHaveCount(1);
-  await card.getByRole("button", { name: "More diagram actions" }).click();
   await expect(
     card.getByRole("button", { name: "Show source" }),
   ).toHaveAttribute("aria-controls", "a1b2c3d4-diagram-1-source");
@@ -363,7 +355,6 @@ test("supports natural sizing, scroll-safe camera controls, styles, focus, and a
   await frame.getByRole("button", { name: "Switch to light theme" }).click();
   await expect(card).toHaveAttribute("data-pi-mermaid-render-theme", "light");
   await expect(svg).not.toHaveClass(/pi-mermaid-polished/);
-  await card.getByRole("button", { name: "More diagram actions" }).click();
   await card.getByRole("button", { name: "Use polished style" }).click();
   await expect(svg).toHaveClass(/pi-mermaid-polished/);
   await frame.getByRole("button", { name: "Switch to dark theme" }).click();
@@ -385,7 +376,6 @@ test("supports natural sizing, scroll-safe camera controls, styles, focus, and a
     card.locator('[data-pi-edge="true"][data-pi-related="true"]'),
   ).toHaveCount(1);
 
-  await card.getByRole("button", { name: "More diagram actions" }).click();
   const trace = card.getByRole("button", { name: "Trace edges" });
   await trace.click();
   const animationName = await card
@@ -611,15 +601,12 @@ test("renders safely at mobile and desktop sizes in dark and light sessions", as
       "Zoom out",
       "Zoom in",
       "Use readable view",
-      "Open fullscreen to pan",
+      "Fullscreen",
     ]) {
       await expect(
         renderedCard.getByRole("button", { name: control, exact: true }),
       ).toBeVisible();
     }
-    await renderedCard
-      .getByRole("button", { name: "More diagram actions" })
-      .click();
     for (const control of [
       "Reset to readable view",
       "Trace edges",
@@ -644,9 +631,6 @@ test("renders safely at mobile and desktop sizes in dark and light sessions", as
       expect(targetSize.width).toBeGreaterThanOrEqual(44);
       expect(targetSize.height).toBeGreaterThanOrEqual(44);
     }
-    await renderedCard
-      .getByRole("button", { name: "More diagram actions" })
-      .click();
     await expect(frame.locator("html")).toHaveAttribute(
       "data-pi-mermaid-theme",
       "light",

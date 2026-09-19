@@ -139,7 +139,6 @@ test("PNG export preserves explicit and wrapped label lines with real Mermaid", 
       },
     });
   });
-  await card.getByRole("button", { name: "More diagram actions" }).click();
   const downloadPromise = page.waitForEvent("download");
   await card.getByRole("button", { name: "Download PNG" }).click();
   const download = await downloadPromise;

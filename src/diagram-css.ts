@@ -18,29 +18,27 @@ const DIAGRAM_CSS = `
   --pi-diagram-mask: #fff;
 }
 .pi-mermaid-card, .pi-mermaid-error-card { position: relative; margin: 1rem 0; border: 1px solid var(--pi-diagram-border); border-radius: .4rem; background: var(--pi-diagram-panel); color: var(--pi-diagram-text); }
-.pi-mermaid-card { overflow: visible; }
-.pi-mermaid-card:has(.pi-mermaid-secondary.is-open) { z-index: 100; }
+.pi-mermaid-card { overflow: hidden; }
 .pi-mermaid-error-card { overflow: hidden; }
 .pi-mermaid-card:focus-visible { outline: 2px solid #2dd4bf; outline-offset: 2px; }
-.pi-mermaid-toolbar { display: flex; position: relative; z-index: 5; flex-wrap: wrap; align-items: center; justify-content: space-between; min-height: 2.75rem; padding: .25rem .4rem; border-bottom: 1px solid var(--pi-diagram-border); border-radius: .4rem .4rem 0 0; background: var(--pi-diagram-panel); }
-.pi-mermaid-toolbar-brand { color: var(--pi-diagram-muted); font: 500 .7rem/1 ui-monospace, SFMono-Regular, Consolas, monospace; text-transform: capitalize; }
-.pi-mermaid-controls { display: flex; position: relative; flex-wrap: wrap; gap: .2rem; align-items: center; }
-.pi-mermaid-control-group { display: flex; gap: .1rem; align-items: center; min-width: 0; margin: 0; border: 0; padding: 0; }
-.pi-mermaid-group-label { width: 1px; height: 1rem; overflow: hidden; background: var(--pi-diagram-border); color: transparent; }
-.pi-mermaid-toolbar button { display: inline-grid; width: 2rem; min-width: 2rem; height: 2rem; min-height: 2rem; place-items: center; border: 0; border-radius: .25rem; background: transparent; color: var(--pi-diagram-muted); padding: 0; cursor: pointer; }
+.pi-mermaid-toolbar { display: flex; position: relative; z-index: 5; flex-wrap: wrap; align-items: center; gap: .5rem; padding: .75rem; border-bottom: 1px solid var(--pi-diagram-border); border-radius: .4rem .4rem 0 0; background: var(--pi-diagram-panel); }
+.pi-mermaid-toolbar-brand { margin-right: auto; color: var(--pi-diagram-muted); font: 500 .7rem/1 ui-monospace, SFMono-Regular, Consolas, monospace; text-transform: capitalize; }
+.pi-mermaid-controls { display: flex; flex: 1 1 40rem; flex-wrap: wrap; justify-content: flex-end; gap: .5rem; align-items: center; min-width: 0; }
+.pi-mermaid-control-group { display: flex; flex: 1 1 100%; flex-wrap: wrap; justify-content: flex-end; gap: .5rem; align-items: center; min-width: 0; margin: 0; border: 0; padding: 0; }
+.pi-mermaid-toolbar button { display: inline-grid; width: 2.75rem; min-width: 2.75rem; height: 2.75rem; min-height: 2.75rem; place-items: center; border: 0; border-radius: .35rem; background: transparent; color: var(--pi-diagram-muted); padding: 0; cursor: pointer; }
 .pi-mermaid-toolbar button svg { width: 1rem; height: 1rem; }
 .pi-mermaid-toolbar button:hover { background: color-mix(in srgb, var(--pi-diagram-border) 35%, transparent); color: var(--pi-diagram-text); }
 .pi-mermaid-toolbar button:focus-visible { outline: 2px solid #2dd4bf; outline-offset: 1px; }
 .pi-mermaid-toolbar button:disabled { opacity: .4; cursor: not-allowed; }
 .pi-mermaid-toolbar .pi-mermaid-retry { width: auto; padding-inline: .45rem; font: 500 .65rem/1 ui-monospace, SFMono-Regular, Consolas, monospace; }
 .pi-mermaid-toolbar .pi-mermaid-retry[hidden] { display: none; }
-.pi-mermaid-toolbar button[aria-pressed="true"], .pi-mermaid-toolbar button[data-state="on"] { background: color-mix(in srgb, #2dd4bf 12%, var(--pi-diagram-panel)); color: #2dd4bf; }
-.pi-mermaid-zoom { min-width: 2.8rem; color: var(--pi-diagram-muted); text-align: center; font: 500 .65rem/1 ui-monospace, SFMono-Regular, Consolas, monospace; }
-.pi-mermaid-more { display: none !important; }
-.pi-mermaid-secondary { display: contents; }
-.pi-mermaid-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.pi-mermaid-toolbar button[aria-pressed="true"] { background: color-mix(in srgb, #2dd4bf 12%, var(--pi-diagram-panel)); color: #2dd4bf; }
+.pi-mermaid-zoom { min-width: 3rem; color: var(--pi-diagram-muted); text-align: center; font: 500 .65rem/1 ui-monospace, SFMono-Regular, Consolas, monospace; font-variant-numeric: tabular-nums; }
+.pi-mermaid-live { flex: 1 0 100%; border-top: 1px solid var(--pi-diagram-border); color: var(--pi-diagram-muted); padding: .5rem 0 0; font: 600 .68rem/1.4 ui-monospace, monospace; }
+.pi-mermaid-live:empty { display: none; }
 .pi-mermaid-inline-status { max-width: 18rem; overflow: hidden; color: var(--pi-diagram-muted); font: 500 .65rem/1.2 ui-monospace, SFMono-Regular, Consolas, monospace; text-overflow: ellipsis; white-space: nowrap; }
-.pi-mermaid-tooltip { z-index: 2147483647; border: 1px solid var(--pi-diagram-border); border-radius: .25rem; background: var(--pi-diagram-panel-soft); color: var(--pi-diagram-text); padding: .35rem .45rem; font: 500 .7rem/1 ui-monospace, SFMono-Regular, Consolas, monospace; }
+.pi-mermaid-tooltip { z-index: 2147483647; border: 1px solid var(--pi-diagram-border); border-radius: .25rem; background: var(--pi-diagram-panel-soft); color: var(--pi-diagram-text); padding: .35rem .45rem; font: 500 .7rem/1 ui-monospace, SFMono-Regular, Consolas, monospace; box-shadow: 0 8px 24px rgb(0 0 0 / 24%); }
+.pi-mermaid-tooltip-arrow { fill: var(--pi-diagram-panel-soft); }
 .pi-mermaid-viewport { position: relative; min-height: 10rem; max-height: 75vh; overflow: hidden; padding: 1rem; background: var(--pi-diagram-panel); cursor: grab; touch-action: pan-y; }
 .pi-mermaid-viewport:focus-visible { outline: 2px solid #2dd4bf; outline-offset: -3px; }
 .pi-mermaid-viewport:active { cursor: grabbing; }
@@ -92,58 +90,12 @@ const DIAGRAM_CSS = `
 .pi-mermaid-pan-hint { margin: 0; border-top: 1px solid var(--pi-diagram-border); color: var(--pi-diagram-muted); padding: .4rem .65rem; font: 600 .68rem/1.4 ui-monospace, monospace; }
 .pi-mermaid-pan-hint[hidden] { display: none; }
 @media (prefers-reduced-motion: reduce) { .pi-mermaid-tracing .pi-mermaid-polished [data-pi-edge="true"] { animation: none; } }
-@media (pointer: coarse) { .pi-mermaid-toolbar button { width: 2.75rem; min-width: 2.75rem; height: 2.75rem; min-height: 2.75rem; } }
-/* Secondary actions use a right-aligned vertical menu instead of resizing the diagram. */
-.pi-mermaid-controls { position: static; width: min(100%, 100%); justify-content: flex-end; }
-.pi-mermaid-more { display: inline-grid !important; }
-.pi-mermaid-more[aria-expanded="true"] {
-  background: color-mix(in srgb, var(--pi-diagram-border) 45%, transparent);
-  color: var(--pi-diagram-text); box-shadow: inset 0 0 0 1px var(--pi-diagram-border);
-}
-.pi-mermaid-secondary {
-  display: none; position: absolute; z-index: 10; top: calc(100% + .35rem); right: .4rem;
-  width: min(19rem, calc(100% - .8rem)); max-height: min(32rem, calc(100vh - 5rem));
-  overflow-y: auto; border: 1px solid var(--pi-diagram-border); border-radius: .45rem;
-  background: var(--pi-diagram-panel-soft); box-shadow: 0 14px 36px rgb(0 0 0 / 28%);
-}
-.pi-mermaid-secondary.is-open { display: block; }
-.pi-mermaid-secondary .pi-mermaid-control-group {
-  display: grid; width: 100%; gap: .1rem; margin: 0; padding: .35rem;
-}
-.pi-mermaid-secondary .pi-mermaid-control-group + .pi-mermaid-control-group {
-  border-top: 1px solid var(--pi-diagram-border);
-}
-.pi-mermaid-menu-heading {
-  width: 100%; margin: 0; padding: .35rem .45rem .25rem; color: var(--pi-diagram-muted);
-  font: 600 .68rem/1.2 ui-monospace, SFMono-Regular, Consolas, monospace;
-}
-.pi-mermaid-toolbar button.is-labeled {
-  display: flex; width: 100%; min-width: 0; height: auto; min-height: 2.5rem;
-  gap: .55rem; justify-content: flex-start; padding: .45rem .55rem;
-  text-align: left; line-height: 1.25;
-}
-.pi-mermaid-toolbar button.is-labeled span { min-width: 0; flex: 1; overflow-wrap: anywhere; }
-.pi-mermaid-toolbar button.is-labeled .pi-mermaid-check { flex: 0 0 auto; color: #2dd4bf; }
-.pi-mermaid-live {
-  display: block; position: static; width: auto; height: auto; min-height: 0;
-  overflow: visible; border-top: 1px solid transparent; clip-path: none;
-  color: var(--pi-diagram-muted); padding: 0 .9rem;
-  font: 600 .68rem/1.4 ui-monospace, monospace; white-space: normal;
-}
-.pi-mermaid-live:not(:empty) { min-height: 2rem; border-top-color: var(--pi-diagram-border); padding-block: .5rem; }
-.pi-mermaid-card:fullscreen, .pi-mermaid-card.pi-mermaid-expanded { overflow: hidden; }
 @media (max-width: 640px) {
   .pi-mermaid-viewport { min-height: 10rem; padding: .5rem; }
   .pi-mermaid-toolbar { align-items: flex-start; }
-  .pi-mermaid-controls { justify-content: flex-end; width: 100%; }
   .pi-mermaid-toolbar > .pi-mermaid-toolbar-brand { width: 100%; }
-  .pi-mermaid-control-group { flex-wrap: wrap; max-width: 100%; }
-  .pi-mermaid-toolbar button { width: 2.75rem; min-width: 2.75rem; height: 2.75rem; min-height: 2.75rem; }
-  .pi-mermaid-toolbar button.is-labeled { width: 100%; min-height: 2.75rem; }
-  .pi-mermaid-group-label { display: none; }
-}
-@media (pointer: coarse) {
-  .pi-mermaid-secondary .pi-mermaid-control { min-height: 2.75rem; }
+  .pi-mermaid-controls { flex-basis: 100%; justify-content: flex-start; }
+  .pi-mermaid-control-group { max-width: 100%; justify-content: flex-start; }
 }
 `;
 
