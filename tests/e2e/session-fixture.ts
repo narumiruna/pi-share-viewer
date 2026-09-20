@@ -10,6 +10,42 @@ export const LIGHT_GIST_ID = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const generatedDirectory = resolve("tests/.generated");
 const generatedSession = (name: string) =>
   resolve(generatedDirectory, `${name}-${process.pid}.html`);
+const SESSION_DATA_PATTERN =
+  /(<script id="session-data" type="application\/json">\s*)([^<\s]+)(\s*<\/script>)/i;
+
+interface SessionDataSummary {
+  entries: Array<{ id: string; type: string }>;
+  header?: { id?: string };
+  leafId: string;
+}
+
+function parseSessionData<T>(html: string): {
+  match: RegExpExecArray;
+  value: T;
+} {
+  const match = SESSION_DATA_PATTERN.exec(html);
+  if (!match) throw new Error("Pi export is missing session-data");
+  return {
+    match,
+    value: JSON.parse(
+      Buffer.from(match[2].trim(), "base64").toString("utf8"),
+    ) as T,
+  };
+}
+
+export function readSessionData<T = SessionDataSummary>(html: string): T {
+  return parseSessionData<T>(html).value;
+}
+
+export function updateSessionData<T>(
+  html: string,
+  update: (session: T) => void,
+): string {
+  const { match, value } = parseSessionData<T>(html);
+  update(value);
+  const encoded = Buffer.from(JSON.stringify(value)).toString("base64");
+  return html.replace(match[0], `${match[1]}${encoded}${match[3]}`);
+}
 
 async function exportFixture(name: string, fixture: string): Promise<string> {
   await mkdir(generatedDirectory, { recursive: true });
@@ -31,38 +67,30 @@ export async function createReviewExportFixture(): Promise<string> {
     "ui-review",
     "tests/fixtures/ui-review.jsonl",
   );
-  const match =
-    /(<script id="session-data" type="application\/json">\s*)([^<]+)(\s*<\/script>)/i.exec(
-      html,
-    );
-  if (!match) throw new Error("Pi export is missing session-data");
-  const payload = JSON.parse(
-    Buffer.from(match[2].trim(), "base64").toString("utf8"),
-  ) as Record<string, unknown>;
-  payload.systemPrompt = Array.from(
-    { length: 28 },
-    (_, index) =>
-      `Sanitized system instruction ${index + 1}: verify readable session behavior without secrets or live services.`,
-  ).join("\n");
-  payload.tools = ["read", "bash", "edit", "write", "review_status"].map(
-    (name) => ({
-      name,
-      description: `Sanitized ${name} tool definition with deliberately long technical metadata for responsive layout review.`,
-      parameters: {
-        type: "object",
-        properties: {
-          input: {
-            type: "string",
-            description:
-              "Sanitized fixture input used only by local browser tests.",
+  return updateSessionData<Record<string, unknown>>(html, (payload) => {
+    payload.systemPrompt = Array.from(
+      { length: 28 },
+      (_, index) =>
+        `Sanitized system instruction ${index + 1}: verify readable session behavior without secrets or live services.`,
+    ).join("\n");
+    payload.tools = ["read", "bash", "edit", "write", "review_status"].map(
+      (name) => ({
+        name,
+        description: `Sanitized ${name} tool definition with deliberately long technical metadata for responsive layout review.`,
+        parameters: {
+          type: "object",
+          properties: {
+            input: {
+              type: "string",
+              description:
+                "Sanitized fixture input used only by local browser tests.",
+            },
           },
+          required: ["input"],
         },
-        required: ["input"],
-      },
-    }),
-  );
-  const encoded = Buffer.from(JSON.stringify(payload)).toString("base64");
-  return html.replace(match[0], `${match[1]}${encoded}${match[3]}`);
+      }),
+    );
+  });
 }
 
 export function replaceSessionText(
@@ -70,43 +98,16 @@ export function replaceSessionText(
   original: string,
   replacement: string,
 ): string {
-  const match =
-    /(<script id="session-data" type="application\/json">\s*)([^<]+)(\s*<\/script>)/i.exec(
-      html,
-    );
-  if (!match) throw new Error("Pi export is missing session-data");
-
-  const payload = JSON.parse(
-    Buffer.from(match[2].trim(), "base64").toString("utf8"),
-  ) as {
+  return updateSessionData<{
     entries: Array<{ message?: { content?: string } }>;
-  };
-  const firstMessage = payload.entries[0]?.message;
-  const content = firstMessage?.content;
-  if (!firstMessage || typeof content !== "string") {
-    throw new Error("Fixture message is missing");
-  }
-  firstMessage.content = content.replace(original, () => replacement);
-
-  const encoded = Buffer.from(JSON.stringify(payload)).toString("base64");
-  return html.replace(match[0], `${match[1]}${encoded}${match[3]}`);
-}
-
-export function readSessionData(html: string): {
-  entries: Array<{ id: string; type: string }>;
-  header?: { id?: string };
-  leafId: string;
-} {
-  const match =
-    /<script id="session-data" type="application\/json">\s*([^<\s]+)\s*<\/script>/i.exec(
-      html,
-    );
-  if (!match) throw new Error("Pi export is missing session-data");
-  return JSON.parse(Buffer.from(match[1], "base64").toString("utf8")) as {
-    entries: Array<{ id: string; type: string }>;
-    header?: { id?: string };
-    leafId: string;
-  };
+  }>(html, (payload) => {
+    const firstMessage = payload.entries[0]?.message;
+    const content = firstMessage?.content;
+    if (!firstMessage || typeof content !== "string") {
+      throw new Error("Fixture message is missing");
+    }
+    firstMessage.content = content.replace(original, () => replacement);
+  });
 }
 
 export async function renderEntryDiagrams(

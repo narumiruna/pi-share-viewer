@@ -2,23 +2,23 @@ import { resolve } from "node:path";
 import { defineConfig } from "vite";
 import { loadKatexCss } from "./build/katex-css.js";
 
+const RUNTIMES = {
+  bootstrap: {
+    entry: "src/session-bootstrap.ts",
+    name: "PiSessionBootstrap",
+  },
+  enhancer: { entry: "src/enhancer.ts", name: "PiMermaidEnhancer" },
+  renderer: { entry: "src/mermaid-renderer.ts", name: "PiMermaidRenderer" },
+} as const;
+
+type RuntimeMode = keyof typeof RUNTIMES;
+
 export default defineConfig(({ mode }) => {
-  if (!["bootstrap", "enhancer", "renderer"].includes(mode)) {
+  if (!Object.hasOwn(RUNTIMES, mode)) {
     throw new Error(`Unsupported runtime mode: ${mode}`);
   }
+  const runtime = RUNTIMES[mode as RuntimeMode];
   const enhancer = mode === "enhancer";
-  const entry =
-    mode === "bootstrap"
-      ? "src/session-bootstrap.ts"
-      : mode === "enhancer"
-        ? "src/enhancer.ts"
-        : "src/mermaid-renderer.ts";
-  const name =
-    mode === "bootstrap"
-      ? "PiSessionBootstrap"
-      : mode === "enhancer"
-        ? "PiMermaidEnhancer"
-        : "PiMermaidRenderer";
 
   return {
     define: {
@@ -30,9 +30,9 @@ export default defineConfig(({ mode }) => {
       outDir: resolve(import.meta.dirname, "public/assets"),
       emptyOutDir: false,
       lib: {
-        entry: resolve(import.meta.dirname, entry),
+        entry: resolve(import.meta.dirname, runtime.entry),
         formats: ["iife"],
-        name,
+        name: runtime.name,
         fileName: () => `mermaid-${mode}.js`,
       },
       minify: "esbuild",

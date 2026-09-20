@@ -22,6 +22,7 @@ import {
   createDiagramView,
   type DiagramViewController,
 } from "./diagram-view.js";
+import { escapeInlineScript } from "./inline-script.js";
 import { MathRenderer } from "./math-render.js";
 import { installMathStyle } from "./math-style.js";
 import {
@@ -37,6 +38,7 @@ import {
   normalizeMermaidSource,
   readSessionCodeBlocks,
 } from "./mermaid-source.js";
+import { createThemeMessage } from "./session-protocol.js";
 import { isDarkColor } from "./theme.js";
 
 installDiagramCss();
@@ -63,13 +65,20 @@ interface RenderedDiagram {
   svg: string;
 }
 
+type DiagramLifecycle =
+  | "queued"
+  | "scheduled"
+  | "rendering"
+  | "waiting-runtime"
+  | "rendered"
+  | "error";
+
 interface DiagramRecord {
   card: HTMLElement;
   diagramId: string;
   displayMode: DiagramDisplayMode;
-  rendering: boolean;
+  lifecycle: DiagramLifecycle;
   retryButton: HTMLButtonElement;
-  scheduled: boolean;
   source: string;
   sourceView: HTMLPreElement;
   status: HTMLElement;
@@ -120,6 +129,20 @@ let scanQueued = false;
 let themeGeneration = 0;
 let targetFocused = false;
 
+function setDiagramLifecycle(
+  record: DiagramRecord,
+  lifecycle: DiagramLifecycle,
+): void {
+  record.lifecycle = lifecycle;
+  if (
+    lifecycle === "waiting-runtime" ||
+    lifecycle === "rendered" ||
+    lifecycle === "error"
+  ) {
+    record.card.dataset.piMermaidState = lifecycle;
+  }
+}
+
 function disposeRecord(record: DiagramRecord): void {
   if (records.get(record.card) !== record) return;
   visibilityObserver?.unobserve(record.card);
@@ -135,10 +158,6 @@ function disposeRecord(record: DiagramRecord): void {
 async function copyText(source: string): Promise<boolean> {
   await writeClipboard(source);
   return true;
-}
-
-function escapeInlineScript(source: string): string {
-  return source.replace(/<\/script/gi, "<\\/script");
 }
 
 function renderMermaidInSandbox(
@@ -278,7 +297,7 @@ function showRenderError(record: DiagramRecord, message: string): void {
   record.sourceView.hidden = false;
   record.card.classList.remove("pi-mermaid-card");
   record.card.classList.add("pi-mermaid-error-card");
-  record.card.dataset.piMermaidState = "error";
+  setDiagramLifecycle(record, "error");
   document.dispatchEvent(new CustomEvent("pi-session-content-layout"));
 }
 
@@ -562,7 +581,7 @@ function mountRenderedDiagram(
   record.card.dataset.piMermaidKind = decoration.kind;
   record.card.dataset.piMermaidDisplay = record.displayMode;
   record.card.dataset.piMermaidRenderTheme = rendered.dark ? "dark" : "light";
-  record.card.dataset.piMermaidState = "rendered";
+  setDiagramLifecycle(record, "rendered");
   record.toolbarBrand.textContent = decoration.kind;
   record.sourceView.hidden = true;
   record.sourceView.before(viewport);
@@ -685,26 +704,20 @@ async function rerenderRecord(
 }
 
 function scheduleInitialRender(record: DiagramRecord, priority: number): void {
-  if (
-    record.scheduled ||
-    record.rendering ||
-    record.view ||
-    record.card.dataset.piMermaidState === "error"
-  )
+  if (record.lifecycle !== "queued" && record.lifecycle !== "waiting-runtime") {
     return;
-  record.scheduled = true;
+  }
+  setDiagramLifecycle(record, "scheduled");
   record.status.textContent = "Rendering diagram…";
   void renderQueue
     .enqueue(
       (signal) => {
-        record.scheduled = false;
-        record.rendering = true;
+        setDiagramLifecycle(record, "rendering");
         return renderMermaidInSandbox(record.source, isDarkTheme, signal);
       },
       { group: "initial", priority },
     )
     .then((rendered) => {
-      record.rendering = false;
       if (!record.card.isConnected) {
         disposeRecord(record);
         return;
@@ -714,8 +727,7 @@ function scheduleInitialRender(record: DiagramRecord, priority: number): void {
         scheduleThemeRender(record, themeGeneration);
     })
     .catch((error) => {
-      record.scheduled = false;
-      record.rendering = false;
+      setDiagramLifecycle(record, "queued");
       if (!record.card.isConnected) {
         disposeRecord(record);
         return;
@@ -726,8 +738,7 @@ function scheduleInitialRender(record: DiagramRecord, priority: number): void {
           ? error.message
           : "Unknown Mermaid rendering error.";
       if (/renderer runtime is unavailable/i.test(message)) {
-        record.scheduled = true;
-        record.card.dataset.piMermaidState = "waiting-runtime";
+        setDiagramLifecycle(record, "waiting-runtime");
         record.status.textContent =
           "Diagram renderer unavailable. Source preserved while text remains readable.";
         record.sourceView.hidden = false;
@@ -836,9 +847,8 @@ function createRecord(
     card,
     diagramId,
     displayMode: "polished",
-    rendering: false,
+    lifecycle: "queued",
     retryButton,
-    scheduled: false,
     source: sourceCode.textContent,
     sourceView,
     status,
@@ -870,7 +880,6 @@ function createLimitedRecord(
   message: string,
 ): void {
   const record = createRecord(code, entryId, diagramNumber, false);
-  record.scheduled = true;
   showRenderError(record, message);
 }
 
@@ -946,7 +955,7 @@ themeToggle.addEventListener("click", () => {
   document.documentElement.dataset.piMermaidTheme = theme;
   updateThemeToggle();
   themeToggle.setAttribute("aria-busy", "true");
-  window.parent.postMessage({ type: "pi-share-viewer-theme", theme }, "*");
+  window.parent.postMessage(createThemeMessage(theme), "*");
 
   const generation = ++themeGeneration;
   renderQueue.cancelOlder("theme", generation);
@@ -962,8 +971,7 @@ document.body.append(themeToggle);
 
 const onRendererReady = () => {
   for (const record of records.values()) {
-    if (record.card.dataset.piMermaidState === "waiting-runtime") {
-      record.scheduled = false;
+    if (record.lifecycle === "waiting-runtime") {
       record.sourceView.hidden = false;
       scheduleInitialRender(record, record.visible ? 100 : 10);
     } else if (record.card.dataset.piMermaidThemeStatus === "error") {

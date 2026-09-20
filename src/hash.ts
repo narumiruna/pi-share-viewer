@@ -1,6 +1,6 @@
-const GIST_ID_PATTERN = /^[0-9a-f]{32}$/i;
+import { isDiagramId, isGistId } from "./session-identifiers.js";
+
 const ENTRY_ID_PATTERN = /^[0-9a-f]{8}$/i;
-const DIAGRAM_ID_PATTERN = /^[0-9a-f]{8}-diagram-(?:[1-9]|[1-4]\d|50)$/i;
 const PI_DEEP_LINK_KEYS = ["leafId", "targetId"] as const;
 const DEEP_LINK_KEYS = [...PI_DEEP_LINK_KEYS, "diagramId"] as const;
 
@@ -20,7 +20,7 @@ export function parseSessionHash(hash: string): SessionHash {
   const value = hash.startsWith("#") ? hash.slice(1) : hash;
   const separator = value.indexOf("&");
   const gistId = separator === -1 ? value : value.slice(0, separator);
-  if (!GIST_ID_PATTERN.test(gistId)) throw invalidSessionUrl();
+  if (!isGistId(gistId)) throw invalidSessionUrl();
 
   const source = separator === -1 ? "" : value.slice(separator + 1);
   const parsed = new URLSearchParams(source);
@@ -38,7 +38,7 @@ export function parseSessionHash(hash: string): SessionHash {
     }
     seen.add(key);
     if (key === "diagramId") {
-      if (!DIAGRAM_ID_PATTERN.test(rawValue)) throw invalidSessionUrl();
+      if (!isDiagramId(rawValue)) throw invalidSessionUrl();
       diagramId = rawValue.toLowerCase();
     } else if (!ENTRY_ID_PATTERN.test(rawValue)) {
       throw invalidSessionUrl();

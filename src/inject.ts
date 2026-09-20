@@ -1,4 +1,6 @@
+import { escapeInlineScript } from "./inline-script.js";
 import { PI_EXPORT_VERSION, prepareMathHook } from "./math-inject.js";
+import { isDiagramId, isGistId } from "./session-identifiers.js";
 import type { SiteTheme } from "./theme.js";
 
 const MAX_BOOTSTRAP_BYTES = 2 * 1024 * 1024;
@@ -22,10 +24,6 @@ function byteLength(value: string): number {
   return new Blob([value]).size;
 }
 
-function escapeInlineScript(source: string): string {
-  return source.replace(/<\/script/gi, "<\\/script");
-}
-
 export function injectSessionViewer(
   sessionHtml: string,
   bootstrapSource: string,
@@ -39,16 +37,13 @@ export function injectSessionViewer(
   if (byteLength(bootstrapSource) > MAX_BOOTSTRAP_BYTES) {
     throw new Error("Session bootstrap is unexpectedly large.");
   }
-  if (!/^[0-9a-f]{32}$/i.test(gistId)) {
+  if (!isGistId(gistId)) {
     throw new Error("Invalid Gist ID.");
   }
   if (!/^[a-zA-Z0-9_-]{8,100}$/.test(loadId)) {
     throw new Error("Invalid session load identity.");
   }
-  if (
-    diagramId &&
-    !/^[0-9a-f]{8}-diagram-(?:[1-9]|[1-4]\d|50)$/i.test(diagramId)
-  ) {
+  if (diagramId && !isDiagramId(diagramId)) {
     throw new Error("Invalid diagram ID.");
   }
 
