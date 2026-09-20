@@ -1,34 +1,15 @@
+import { escapeInlineScript } from "./inline-script.js";
 import { createMathParser, type PiMarkdownParser } from "./math-source.js";
 import { isMermaidRendererReady } from "./mermaid-render-protocol.js";
+import {
+  createReadyMessage,
+  createRuntimeActiveMessage,
+  createRuntimeFailedMessage,
+  isRuntimeMessage,
+} from "./session-protocol.js";
 import { installSessionStyle } from "./session-style.js";
 
-const MAX_RUNTIME_BYTES = 8 * 1024 * 1024;
 const RENDERER_PROBE_TIMEOUT_MS = 5_000;
-
-interface RuntimeMessage {
-  kind: "enhancer" | "renderer";
-  loadId: string;
-  source: string;
-  type: "pi-share-viewer-runtime";
-}
-
-function isRuntimeMessage(
-  value: unknown,
-  loadId: string,
-): value is RuntimeMessage {
-  if (!value || typeof value !== "object") return false;
-  const message = value as Record<string, unknown>;
-  return (
-    message.type === "pi-share-viewer-runtime" &&
-    message.loadId === loadId &&
-    (message.kind === "enhancer" || message.kind === "renderer") &&
-    typeof message.source === "string" &&
-    new Blob([message.source]).size <= MAX_RUNTIME_BYTES &&
-    Object.keys(message).every((key) =>
-      ["type", "loadId", "kind", "source"].includes(key),
-    )
-  );
-}
 
 const loadId =
   document.querySelector<HTMLMetaElement>('meta[name="pi-load-id"]')?.content ??
@@ -66,10 +47,6 @@ if (compatible) {
     });
   }
   installSessionStyle();
-}
-
-function escapeInlineScript(source: string): string {
-  return source.replace(/<\/script/gi, "<\\/script");
 }
 
 function verifyRenderer(source: string): Promise<void> {
@@ -132,13 +109,13 @@ window.addEventListener("message", (event: MessageEvent) => {
           new CustomEvent("pi-share-viewer-renderer-ready"),
         );
         window.parent.postMessage(
-          { type: "pi-share-viewer-runtime-active", loadId, kind: "renderer" },
+          createRuntimeActiveMessage(loadId, "renderer"),
           "*",
         );
       })
       .catch(() => {
         window.parent.postMessage(
-          { type: "pi-share-viewer-runtime-failed", loadId, kind: "renderer" },
+          createRuntimeFailedMessage(loadId, "renderer"),
           "*",
         );
       })
@@ -155,16 +132,16 @@ window.addEventListener("message", (event: MessageEvent) => {
   enhancerInstalled = runtime.dataset.piEnhancerActive === "true";
   if (enhancerInstalled) {
     window.parent.postMessage(
-      { type: "pi-share-viewer-runtime-active", loadId, kind: "enhancer" },
+      createRuntimeActiveMessage(loadId, "enhancer"),
       "*",
     );
   } else {
     runtime.remove();
     window.parent.postMessage(
-      { type: "pi-share-viewer-runtime-failed", loadId, kind: "enhancer" },
+      createRuntimeFailedMessage(loadId, "enhancer"),
       "*",
     );
   }
 });
 
-window.parent.postMessage({ type: "pi-share-viewer-ready", loadId }, "*");
+window.parent.postMessage(createReadyMessage(loadId), "*");

@@ -1,3 +1,5 @@
+import { isGistId } from "./session-identifiers.js";
+
 export const SESSION_FILENAME = "session.html";
 const GIST_API_ORIGIN = "https://api.github.com";
 const RAW_GIST_HOST = "gist.githubusercontent.com";
@@ -140,7 +142,7 @@ export async function loadSessionHtml(
   gistId: string,
   options: SessionLoadOptions = {},
 ): Promise<string> {
-  if (!/^[0-9a-f]{32}$/i.test(gistId)) {
+  if (!isGistId(gistId)) {
     throw new GistLoadError("Invalid Gist ID.");
   }
 

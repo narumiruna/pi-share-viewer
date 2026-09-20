@@ -6,6 +6,7 @@ import {
   mockGist,
   readSessionData,
   replaceSessionText,
+  updateSessionData,
 } from "./session-fixture.js";
 
 interface FixtureEntry {
@@ -27,16 +28,7 @@ function rewrite(
   html: string,
   update: (session: { entries: FixtureEntry[]; leafId: string }) => void,
 ): string {
-  const session = readSessionData(html) as {
-    entries: FixtureEntry[];
-    leafId: string;
-  };
-  update(session);
-  return html.replace(
-    /(<script id="session-data" type="application\/json">)[^<]+(<\/script>)/i,
-    (_match, open, close) =>
-      `${open}${Buffer.from(JSON.stringify(session)).toString("base64")}${close}`,
-  );
+  return updateSessionData(html, update);
 }
 
 test("preserves roles, content parts, branch navigation and original JSONL", async ({

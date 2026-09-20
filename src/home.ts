@@ -1,3 +1,4 @@
+import { writeClipboard } from "./clipboard.js";
 import {
   applyTheme,
   getPreferredTheme,
@@ -33,32 +34,6 @@ function installThemeToggle(): void {
   });
 }
 
-async function copyText(value: string): Promise<void> {
-  try {
-    await navigator.clipboard.writeText(value);
-    return;
-  } catch {
-    const previousFocus =
-      document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : undefined;
-    const textarea = document.createElement("textarea");
-    textarea.value = value;
-    textarea.style.position = "fixed";
-    textarea.style.opacity = "0";
-    document.body.append(textarea);
-    textarea.select();
-    try {
-      if (!document.execCommand("copy")) throw new Error("Copy failed");
-    } finally {
-      textarea.remove();
-      if (previousFocus?.isConnected) {
-        previousFocus.focus({ preventScroll: true });
-      }
-    }
-  }
-}
-
 function installCopyButtons(): void {
   for (const button of document.querySelectorAll<HTMLButtonElement>(
     ".copy-button[data-copy-target]",
@@ -75,7 +50,7 @@ function installCopyButtons(): void {
     button.addEventListener("click", async () => {
       window.clearTimeout(resetTimer);
       try {
-        await copyText(target.textContent ?? "");
+        await writeClipboard(target.textContent ?? "");
         if (label) label.textContent = "Copied";
         button.setAttribute("aria-label", `${defaultAriaLabel} — copied`);
         button.dataset.copied = "true";
