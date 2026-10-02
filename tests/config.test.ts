@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { describe, expect, test } from "vitest";
 import appConfig from "../vite.config.js";
@@ -36,6 +37,25 @@ describe("repository shape", () => {
       react: expect.any(String),
       "react-dom": expect.any(String),
     });
+  });
+
+  test("honors the brace-expansion override inside Pi's shrinkwrapped tree", () => {
+    const packageJson = JSON.parse(readFileSync("package.json", "utf8")) as {
+      overrides: Record<string, Record<string, string>>;
+    };
+    const piRequire = createRequire(
+      resolve("node_modules/@earendil-works/pi-coding-agent/package.json"),
+    );
+    const minimatchRequire = createRequire(piRequire.resolve("minimatch"));
+    const braceExpansion = minimatchRequire("brace-expansion/package.json") as {
+      version: string;
+    };
+
+    expect(braceExpansion.version).toBe(
+      packageJson.overrides["@earendil-works/pi-coding-agent"][
+        "brace-expansion"
+      ],
+    );
   });
 
   test("builds HTML entries from src with root-level public assets and output", () => {
