@@ -1,6 +1,16 @@
-import { describe, expect, test, vi } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import { loadSessionHtml } from "../src/gist.js";
+import { loadGistEmbedMetadata } from "../src/gist-embed.js";
 import { parseGistId, parseSessionHash } from "../src/hash.js";
+
+vi.mock("../src/gist-embed.js", () => ({
+  loadGistEmbedMetadata: vi.fn(),
+}));
+
+beforeEach(() => {
+  vi.mocked(loadGistEmbedMetadata).mockReset();
+  vi.mocked(loadGistEmbedMetadata).mockRejectedValue(new Error("unavailable"));
+});
 
 const GIST_ID = "2b736fe885c106e7ee125d52b1cfecbb";
 
@@ -157,6 +167,87 @@ describe("Gist loader", () => {
     await expect(loadSessionHtml(GIST_ID, { fetch: fetcher })).rejects.toThrow(
       message,
     );
+  });
+
+  test.each([403, 429])(
+    "falls back to raw content after API HTTP %s",
+    async (status) => {
+      vi.mocked(loadGistEmbedMetadata).mockResolvedValue({
+        owner: "owner",
+        files: ["session.html"],
+      });
+      const progress = vi.fn();
+      const controller = new AbortController();
+      const fetcher = vi
+        .fn<typeof fetch>()
+        .mockResolvedValueOnce(new Response("limited", { status }))
+        .mockResolvedValueOnce(new Response("raw session"));
+      await expect(
+        loadSessionHtml(GIST_ID.toUpperCase(), {
+          fetch: fetcher,
+          onProgress: progress,
+          signal: controller.signal,
+        }),
+      ).resolves.toBe("raw session");
+      expect(loadGistEmbedMetadata).toHaveBeenCalledWith(
+        GIST_ID,
+        controller.signal,
+      );
+      expect(fetcher.mock.calls[1]).toEqual([
+        new URL(
+          `https://gist.githubusercontent.com/owner/${GIST_ID}/raw/session.html`,
+        ),
+        { signal: controller.signal },
+      ]);
+      expect(progress).toHaveBeenLastCalledWith({ loadedBytes: 11 });
+    },
+  );
+
+  test("rejects missing fallback files before downloading", async () => {
+    vi.mocked(loadGistEmbedMetadata).mockResolvedValue({
+      owner: "owner",
+      files: ["other.html"],
+    });
+    const fetcher = vi.fn(async () => new Response("limited", { status: 403 }));
+    await expect(loadSessionHtml(GIST_ID, { fetch: fetcher })).rejects.toThrow(
+      "does not contain session.html",
+    );
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  test("validates fallback redirects and raw HTTP failures", async () => {
+    vi.mocked(loadGistEmbedMetadata).mockResolvedValue({
+      owner: "owner",
+      files: ["session.html"],
+    });
+    for (const rawResponse of [
+      responseFromUrl(
+        `https://gist.githubusercontent.com/owner/${GIST_ID}/raw/other.html`,
+      ),
+      responseFromUrl("https://untrusted.example/session.html"),
+      new Response("failure", { status: 500 }),
+    ]) {
+      const fetcher = vi
+        .fn<typeof fetch>()
+        .mockResolvedValueOnce(new Response("limited", { status: 429 }))
+        .mockResolvedValueOnce(rawResponse);
+      await expect(
+        loadSessionHtml(GIST_ID, { fetch: fetcher }),
+      ).rejects.toThrow(/unexpected|failed \(500\)/);
+    }
+  });
+
+  test("preserves cancellation during fallback discovery", async () => {
+    const controller = new AbortController();
+    vi.mocked(loadGistEmbedMetadata).mockImplementation(async () => {
+      controller.abort();
+      throw controller.signal.reason;
+    });
+    const fetcher = vi.fn(async () => new Response("limited", { status: 403 }));
+    await expect(
+      loadSessionHtml(GIST_ID, { fetch: fetcher, signal: controller.signal }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
   test("rejects missing or non-HTML session files", async () => {

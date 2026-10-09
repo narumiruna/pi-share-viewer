@@ -1,3 +1,4 @@
+import { type GistEmbedMetadata, loadGistEmbedMetadata } from "./gist-embed.js";
 import { isGistId } from "./session-identifiers.js";
 
 export const SESSION_FILENAME = "session.html";
@@ -154,6 +155,33 @@ export async function loadSessionHtml(
   });
 
   assertResponseHost(response, "api.github.com");
+  if (response.status === 403 || response.status === 429) {
+    let metadata: GistEmbedMetadata;
+    try {
+      metadata = await loadGistEmbedMetadata(
+        gistId.toLowerCase(),
+        options.signal,
+      );
+    } catch (error) {
+      if (options.signal?.aborted) throw error;
+      throw explainHttpError(response);
+    }
+    if (!metadata.files.includes(SESSION_FILENAME)) {
+      throw new GistLoadError(`Gist does not contain ${SESSION_FILENAME}.`);
+    }
+    const rawUrl = assertRawGistUrl(
+      `https://${RAW_GIST_HOST}/${metadata.owner}/${gistId.toLowerCase()}/raw/${SESSION_FILENAME}`,
+      gistId.toLowerCase(),
+    );
+    const rawResponse = await request(fetcher, rawUrl, {
+      signal: options.signal,
+    });
+    assertResponseHost(rawResponse, RAW_GIST_HOST);
+    if (rawResponse.url)
+      assertRawGistUrl(rawResponse.url, gistId.toLowerCase());
+    if (!rawResponse.ok) throw explainHttpError(rawResponse);
+    return readText(rawResponse, options.onProgress);
+  }
   if (!response.ok) throw explainHttpError(response);
   const contentType = response.headers.get("content-type");
   if (contentType && !contentType.toLowerCase().includes("json")) {

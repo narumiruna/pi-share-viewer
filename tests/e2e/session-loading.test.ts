@@ -113,6 +113,58 @@ test("shows raw session download progress in the loading status", async ({
   );
 });
 
+test("API rate limits fall back through isolated embed metadata to raw content", async ({
+  page,
+}) => {
+  const html = await createReviewExportFixture();
+  await page.route("https://api.github.com/gists/**", (route) =>
+    route.fulfill({ status: 403, body: "rate limited" }),
+  );
+  await page.route(
+    `https://gist.github.com/${DARK_GIST_ID}.json?callback=piGistMetadata`,
+    (route) =>
+      route.fulfill({
+        contentType: "application/javascript",
+        body: `
+        let isolated = false;
+        try { parent.document.body.dataset.embedAccess = "unsafe"; }
+        catch { isolated = true; }
+        if (!isolated) throw new Error("Embed frame can access the viewer");
+        piGistMetadata(${JSON.stringify({ owner: "owner", files: ["session.html"], div: "unused" })});
+      `,
+      }),
+  );
+  await page.route(
+    `https://gist.githubusercontent.com/owner/${DARK_GIST_ID}/raw/session.html`,
+    (route) => route.fulfill({ contentType: "text/plain", body: html }),
+  );
+  await page.goto(`/session/#${DARK_GIST_ID}`);
+  await expect(
+    page.frameLocator("#preview").locator("#entry-11111111"),
+  ).toBeVisible();
+  await expect(page.locator("#error")).toBeHidden();
+  await expect(page.locator("iframe")).toHaveCount(1);
+});
+
+test("failed rate-limit fallback remains retryable and cleans up", async ({
+  page,
+}) => {
+  await page.route("https://api.github.com/gists/**", (route) =>
+    route.fulfill({ status: 429, body: "rate limited" }),
+  );
+  await page.route("https://gist.github.com/**", (route) =>
+    route.fulfill({ status: 503, body: "unavailable" }),
+  );
+  await page.goto(`/session/#${DARK_GIST_ID}`);
+  await expect(page.locator("#error-message")).toContainText(
+    "GitHub rate limit reached",
+  );
+  await expect(
+    page.getByRole("button", { name: "Retry session" }),
+  ).toBeVisible();
+  await expect(page.locator("iframe")).toHaveCount(1);
+});
+
 test("renderer failure leaves math readable and retry preserves viewer state", async ({
   page,
 }) => {
