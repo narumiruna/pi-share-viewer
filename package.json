@@ -33,7 +33,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",
-    "@earendil-works/pi-coding-agent": "1.0.0",
+    "@earendil-works/pi-coding-agent": "1.0.4",
     "@playwright/test": "^1.63.0",
     "@types/katex": "^0.16.8",
     "@types/node": "^26.6.4",
