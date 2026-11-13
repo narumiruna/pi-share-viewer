@@ -33,7 +33,7 @@ Requires Node.js **22.22.2+**; browser tests also require Google Chrome.
 ```bash
 npm ci                    # Install dependencies and Git hooks
 npm run dev               # http://localhost:5173/
-./scripts/pre-commit.sh   # Apply safe Biome fixes and formatting
+PATH="$PWD/node_modules/.bin:$PATH" ./scripts/pre-commit.sh
 npm run check             # Check lint and formatting without changes
 npm test                  # Unit tests
 npm run typecheck         # TypeScript checks
@@ -41,9 +41,9 @@ npm run build             # Production build
 npm run test:e2e          # Playwright browser tests
 ```
 
-The pre-commit hook runs `./scripts/pre-commit.sh` with the project's installed Biome version. It checks `build/`, `src/`, `tests/`, and the listed root configuration files. Review and stage any fixes before you commit; the script does not stage files. Tests, type checks, and builds run separately in CI and the deployment workflow, not in the hook. `npm ci` still installs dependencies; only the combined `npm run ci` script was removed.
+The pre-commit hook runs `./scripts/pre-commit.sh`. The script directly runs `biome migrate --write`, `biome check --write src`, and `biome format --write src`. Husky adds `node_modules/.bin` to `PATH`; the manual command above does the same. Review and stage any configuration changes and source fixes; the script does not stage files.
 
-After a Biome upgrade, run `npm exec -- biome migrate --write` and review the configuration changes. Configuration migration is not part of the hook.
+Tests, type checks, and builds run separately in CI and the deployment workflow, not in the hook. `npm run check` runs read-only Biome checks across the build code, source, tests, and listed root configuration files. `npm ci` installs dependencies; the combined `npm run ci` script was removed.
 
 HTML entries are in `src/index.html` and `src/session/index.html`; static assets are in `public/`. Open `/session/#<gist-id>` to view a session locally. Production output is in `dist/`. E2E tests use a local Pi export and mocked GitHub requests, not real Gists. Chrome/Chromium is verified; Firefox and Safari are not.
 

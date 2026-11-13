@@ -24,7 +24,7 @@
     "build:renderer": "vite build --config vite.runtime.config.ts --mode renderer",
     "dev": "npm run build:bootstrap && npm run build:renderer && npm run build:enhancer && vite",
     "preview": "vite preview",
-    "check": "biome check build src tests biome.json package.json tsconfig.json playwright.config.ts vite.config.ts vite.runtime.config.ts vitest.config.ts",
+    "check": "biome ci build src tests package.json tsconfig.json playwright.config.ts vite.config.ts vite.runtime.config.ts vitest.config.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "npm run build && playwright test",

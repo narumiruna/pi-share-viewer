@@ -4,4 +4,6 @@ set -eu
 
 cd "$(dirname "$0")/.."
 
-npm run check -- --write
+biome migrate --write
+biome check --write src
+biome format --write src
