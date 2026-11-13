@@ -31,11 +31,19 @@ The deployment workflow handles the GitHub Pages base path automatically.
 Requires Node.js **22.22.2+**; browser tests also require Google Chrome.
 
 ```bash
-npm ci
-npm run dev        # http://localhost:5173/
-npm run ci         # lint, unit tests, typecheck, production build
-npm run test:e2e   # Playwright browser tests
+npm ci                    # Install dependencies and Git hooks
+npm run dev               # http://localhost:5173/
+PATH="$PWD/node_modules/.bin:$PATH" ./scripts/pre-commit.sh
+npm run check             # Check lint and formatting without changes
+npm test                  # Unit tests
+npm run typecheck         # TypeScript checks
+npm run build             # Production build
+npm run test:e2e          # Playwright browser tests
 ```
+
+The pre-commit hook runs `./scripts/pre-commit.sh`. The script directly runs `biome migrate --write`, `biome check --write src`, and `biome format --write src`. Husky adds `node_modules/.bin` to `PATH`; the manual command above does the same. Review and stage any configuration changes and source fixes; the script does not stage files.
+
+Tests, type checks, and builds run separately in CI and the deployment workflow, not in the hook. `npm run check` runs read-only Biome checks across the build code, source, tests, and listed root configuration files. `npm ci` installs dependencies; the combined `npm run ci` script was removed.
 
 HTML entries are in `src/index.html` and `src/session/index.html`; static assets are in `public/`. Open `/session/#<gist-id>` to view a session locally. Production output is in `dist/`. E2E tests use a local Pi export and mocked GitHub requests, not real Gists. Chrome/Chromium is verified; Firefox and Safari are not.
 

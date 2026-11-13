@@ -1,1 +1,1 @@
-npm run ci
+./scripts/pre-commit.sh
