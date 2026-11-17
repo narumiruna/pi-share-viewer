@@ -41,6 +41,33 @@ function makeView(
   return { stage, viewport };
 }
 
+function makeNode(stage: HTMLElement): SVGGElement {
+  const svg = stage.querySelector("svg");
+  if (!svg) throw new Error("Diagram fixture missing");
+  const node = document.createElementNS("http://www.w3.org/2000/svg", "g");
+  node.dataset.diagramNode = "";
+  node.dataset.piTone = "accent";
+  node.tabIndex = 0;
+  node.setAttribute("role", "button");
+  svg.append(node);
+  return node;
+}
+
+function touch(type: string, x: number, y: number): MouseEvent {
+  const event = new MouseEvent(type, {
+    bubbles: true,
+    cancelable: true,
+    clientX: x,
+    clientY: y,
+    detail: type === "click" ? 1 : 0,
+  });
+  Object.defineProperties(event, {
+    pointerId: { value: 1 },
+    pointerType: { value: "touch" },
+  });
+  return event;
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
@@ -90,7 +117,7 @@ describe("diagram view", () => {
       view.zoomBy(0.8);
       expect(view.getState().scale).toBe(scale);
       view.zoomBy(10);
-      view.fit();
+      view.setCameraMode("overview");
       expect(view.getState().scale).toBe(scale);
       Object.defineProperty(viewport, "clientWidth", { value: 200 });
       Object.defineProperty(viewport, "clientHeight", { value: 100 });
@@ -146,28 +173,111 @@ describe("diagram view", () => {
     view.destroy();
   });
 
+  test("translates scale and crop callbacks into the host contract", () => {
+    const { stage, viewport } = makeView(400, 200, 800, 200);
+    const onScaleChange = vi.fn();
+    const onCropChange = vi.fn((cropped: boolean) => {
+      expect(viewport.dataset.piDiagramCropped).toBe(String(cropped));
+    });
+    const view = createDiagramView(viewport, stage, {
+      onCropChange,
+      onScaleChange,
+    });
+
+    expect(onScaleChange).toHaveBeenLastCalledWith(50);
+    expect(onCropChange).toHaveBeenLastCalledWith(false);
+    view.reset();
+    expect(onScaleChange).toHaveBeenLastCalledWith(100);
+    expect(onCropChange).toHaveBeenLastCalledWith(true);
+    view.setCameraMode("overview");
+    expect(onCropChange).toHaveBeenLastCalledWith(false);
+    view.destroy();
+  });
+
+  test("can zoom back to the fitted floor after zooming in", () => {
+    const { stage, viewport } = makeView(400, 200, 4_000, 1_000);
+    const view = createDiagramView(viewport, stage);
+    view.zoomBy(10);
+    expect(view.getState().scale).toBe(1);
+    view.zoomBy(0.1);
+    expect(view.getState().scale).toBe(0.1);
+    view.destroy();
+  });
+
+  test("keeps small HTML-only labels legible in readable mode", () => {
+    const { stage, viewport } = makeView(400, 200, 800, 200);
+    const svg = stage.querySelector("svg");
+    if (!svg) throw new Error("Diagram fixture missing");
+    svg.innerHTML = `<foreignObject width="100" height="50"><div xmlns="http://www.w3.org/1999/xhtml"><p style="font-size: 10px"><span style="font-size: 8px">Small label</span></p></div></foreignObject>`;
+    const onScaleChange = vi.fn();
+    const view = createDiagramView(viewport, stage, { onScaleChange });
+    view.reset();
+
+    expect(view.getState()).toMatchObject({
+      cameraMode: "readable",
+      scale: 1.75,
+    });
+    expect(onScaleChange).toHaveBeenLastCalledWith(175);
+    view.destroy();
+  });
+
+  test("preserves manual zoom on refresh and can explicitly refit", () => {
+    const { stage, viewport } = makeView(400, 200, 800, 200);
+    const onCameraModeChange = vi.fn();
+    const view = createDiagramView(viewport, stage, { onCameraModeChange });
+    view.zoomBy(2);
+    Object.defineProperty(viewport, "clientWidth", { value: 600 });
+    view.refresh();
+    expect(view.getState()).toMatchObject({ scale: 1, userModified: true });
+    view.refresh(true);
+    expect(view.getState()).toMatchObject({ scale: 0.75, userModified: false });
+    expect(onCameraModeChange).toHaveBeenLastCalledWith("overview");
+    view.destroy();
+  });
+
+  test("pans expanded touch gestures beginning on a focusable diagram node", () => {
+    const { stage, viewport } = makeView(400, 200, 800, 400);
+    const node = makeNode(stage);
+    const view = createDiagramView(viewport, stage, {
+      isExpanded: () => true,
+    });
+    view.reset();
+    const before = stage.style.transform;
+    node.dispatchEvent(touch("pointerdown", 100, 100));
+    const move = touch("pointermove", 30, 60);
+    node.dispatchEvent(move);
+    node.dispatchEvent(touch("pointerup", 30, 60));
+
+    expect(move.defaultPrevented).toBe(true);
+    expect(stage.style.transform).not.toBe(before);
+    view.destroy();
+  });
+
+  test("does not select a diagram node after a completed touch drag", () => {
+    const { stage, viewport } = makeView(400, 200, 800, 400);
+    const node = makeNode(stage);
+    const activated = vi.fn();
+    node.addEventListener("click", activated);
+    const view = createDiagramView(viewport, stage, {
+      isExpanded: () => true,
+    });
+    view.reset();
+    node.dispatchEvent(touch("pointerdown", 100, 100));
+    node.dispatchEvent(touch("pointermove", 30, 60));
+    node.dispatchEvent(touch("pointerup", 30, 60));
+    const click = touch("click", 30, 60);
+    node.dispatchEvent(click);
+
+    expect(click.defaultPrevented).toBe(true);
+    expect(activated).not.toHaveBeenCalled();
+    node.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(activated).toHaveBeenCalledOnce();
+    view.destroy();
+  });
+
   test("does not suppress a tap after a cancelled touch gesture", () => {
     const { stage, viewport } = makeView();
-    const node = stage
-      .querySelector("svg")
-      ?.appendChild(
-        document.createElementNS("http://www.w3.org/2000/svg", "g"),
-      );
-    if (!node) throw new Error("Diagram node fixture failed");
-    node.dataset.piTone = "accent";
-    const touch = (type: string, x: number, y: number) => {
-      const event = new MouseEvent(type, {
-        bubbles: true,
-        cancelable: true,
-        clientX: x,
-        clientY: y,
-      });
-      Object.defineProperties(event, {
-        pointerId: { value: 1 },
-        pointerType: { value: "touch" },
-      });
-      return event;
-    };
+    const node = makeNode(stage);
     const activated = vi.fn();
     node.addEventListener("click", activated);
     const view = createDiagramView(viewport, stage, {
@@ -177,12 +287,63 @@ describe("diagram view", () => {
     node.dispatchEvent(touch("pointerdown", 100, 100));
     node.dispatchEvent(touch("pointermove", 130, 100));
     node.dispatchEvent(touch("pointercancel", 130, 100));
-    const tap = new MouseEvent("click", { bubbles: true, cancelable: true });
+    node.dispatchEvent(touch("pointerdown", 100, 100));
+    node.dispatchEvent(touch("pointerup", 100, 100));
+    const tap = touch("click", 100, 100);
     node.dispatchEvent(tap);
 
     expect(tap.defaultPrevented).toBe(false);
     expect(activated).toHaveBeenCalledOnce();
     view.destroy();
+  });
+
+  test("leaves inline touch and nested native controls alone", () => {
+    const { stage, viewport } = makeView(400, 200, 800, 400);
+    const node = makeNode(stage);
+    let expanded = false;
+    const view = createDiagramView(viewport, stage, {
+      isExpanded: () => expanded,
+    });
+    const before = stage.style.transform;
+    const move = touch("pointermove", 30, 60);
+    node.dispatchEvent(touch("pointerdown", 100, 100));
+    node.dispatchEvent(move);
+    node.dispatchEvent(touch("pointerup", 30, 60));
+    expect(move.defaultPrevented).toBe(false);
+    expect(stage.style.transform).toBe(before);
+
+    expanded = true;
+    const input = document.createElement("input");
+    node.append(input);
+    input.dispatchEvent(touch("pointerdown", 100, 100));
+    const controlMove = touch("pointermove", 30, 60);
+    input.dispatchEvent(controlMove);
+    input.dispatchEvent(touch("pointerup", 30, 60));
+    expect(controlMove.defaultPrevented).toBe(false);
+    expect(stage.style.transform).toBe(before);
+    view.destroy();
+  });
+
+  test("releases gesture and keyboard listeners on destruction", () => {
+    const { stage, viewport } = makeView(400, 200, 800, 400);
+    const node = makeNode(stage);
+    const onScaleChange = vi.fn();
+    const view = createDiagramView(viewport, stage, {
+      isExpanded: () => true,
+      onScaleChange,
+    });
+    node.dispatchEvent(touch("pointerdown", 100, 100));
+    view.destroy();
+    const before = stage.style.transform;
+    onScaleChange.mockClear();
+    node.dispatchEvent(touch("pointermove", 30, 60));
+    viewport.dispatchEvent(new KeyboardEvent("keydown", { key: "+" }));
+    const click = touch("click", 30, 60);
+    node.dispatchEvent(click);
+
+    expect(stage.style.transform).toBe(before);
+    expect(onScaleChange).not.toHaveBeenCalled();
+    expect(click.defaultPrevented).toBe(false);
   });
 
   test("supports keyboard zoom, fit, and escape", () => {

@@ -28,10 +28,11 @@ The deployment workflow handles the GitHub Pages base path automatically.
 
 ## Development
 
-Requires Node.js **22.22.2+**; browser tests also require Google Chrome.
+Requires Node.js **24.15.x or later 24.x, or 26+**, and npm **11+**. Browser tests use Playwright Chromium; install it after dependencies.
 
 ```bash
 npm ci                    # Install dependencies and Git hooks
+npx playwright install chromium # Install the browser for E2E tests
 npm run dev               # http://localhost:5173/
 PATH="$PWD/node_modules/.bin:$PATH" ./scripts/pre-commit.sh
 npm run check             # Check lint and formatting without changes
@@ -45,7 +46,15 @@ The pre-commit hook runs `./scripts/pre-commit.sh`. The script directly runs `bi
 
 Tests, type checks, and builds run separately in CI and the deployment workflow, not in the hook. `npm run check` runs read-only Biome checks across the build code, source, tests, and listed root configuration files. `npm ci` installs dependencies; the combined `npm run ci` script was removed.
 
-HTML entries are in `src/index.html` and `src/session/index.html`; static assets are in `public/`. Open `/session/#<gist-id>` to view a session locally. Production output is in `dist/`. E2E tests use a local Pi export and mocked GitHub requests, not real Gists. Chrome/Chromium is verified; Firefox and Safari are not.
+HTML entries are in `src/index.html` and `src/session/index.html`; static assets are in `public/`. Open `/session/#<gist-id>` to view a session locally. Production output is in `dist/`. E2E tests use a local Pi export and mocked GitHub requests, not real Gists. The test configuration passes `--ozone-platform=wayland` in WSL. Chromium is tested; Firefox and Safari are not.
+
+Diagram camera behavior comes from `@narumitw/diagram-viewer/core`. This viewer still owns Mermaid rendering, the sandbox and resource limits, diagram controls, styling, and SVG/PNG exports. No remote renderer or package stylesheet is loaded.
+
+### Shared camera migration status
+
+This migration is not ready for deployment because of the verification and license issues below. The dependency is now pinned to the published `@narumitw/diagram-viewer@0.2.0`, which includes the focusable-node touch and HTML-label readability fixes from [Morsel PR #171](https://github.com/narumiruna/morsel/pull/171). No sibling checkout or temporary tarball is required.
+
+The baseline full browser suite also has 35 existing math/session failures. Those gates have not been waived. Before distribution or deployment, the owner must resolve the license declarations: this project's `package.json` says MIT, its `LICENSE` contains AGPLv3, and the shared package declares `AGPL-3.0-only`. Real touch devices, screen readers, Firefox, and Safari remain unverified.
 
 ## Session controls
 
