@@ -147,6 +147,125 @@ describe("diagram view", () => {
     view.destroy();
   });
 
+  test.each(["ctrlKey", "metaKey"] as const)(
+    "zooms around modified wheel input on a selectable node (%s)",
+    (modifier) => {
+      const { stage, viewport } = makeView(400, 200, 800, 400);
+      const node = makeNode(stage);
+      const view = createDiagramView(viewport, stage);
+      const before = { ...view.getState() };
+      const worldX = (150 - before.x) / before.scale;
+      const wheel = new WheelEvent("wheel", {
+        bubbles: true,
+        cancelable: true,
+        clientX: 150,
+        clientY: 100,
+        deltaY: -100,
+        [modifier]: true,
+      });
+      node.dispatchEvent(wheel);
+
+      expect(wheel.defaultPrevented).toBe(true);
+      expect(view.getState().scale).toBeCloseTo(0.55);
+      expect(view.getState().x + worldX * view.getState().scale).toBeCloseTo(
+        150,
+      );
+      view.destroy();
+    },
+  );
+
+  test("keeps camera shortcuts available from a focused diagram node", () => {
+    const { stage, viewport } = makeView(400, 200, 800, 400);
+    const node = makeNode(stage);
+    const view = createDiagramView(viewport, stage);
+    view.reset();
+    const pan = new KeyboardEvent("keydown", {
+      bubbles: true,
+      cancelable: true,
+      key: "ArrowRight",
+    });
+    node.dispatchEvent(pan);
+    expect(pan.defaultPrevented).toBe(true);
+    expect(view.getState().x).toBe(-40);
+    node.dispatchEvent(
+      new KeyboardEvent("keydown", { bubbles: true, key: "+" }),
+    );
+    expect(view.getState().scale).toBe(1.25);
+    node.dispatchEvent(
+      new KeyboardEvent("keydown", { bubbles: true, key: "0" }),
+    );
+    expect(view.getState().scale).toBe(0.5);
+    view.destroy();
+  });
+
+  test("does not route camera input from native controls inside a diagram node", () => {
+    const { stage, viewport } = makeView(400, 200, 800, 400);
+    const node = makeNode(stage);
+    const input = document.createElement("input");
+    node.append(input);
+    const view = createDiagramView(viewport, stage);
+    const before = stage.style.transform;
+    const wheel = new WheelEvent("wheel", {
+      bubbles: true,
+      cancelable: true,
+      ctrlKey: true,
+      deltaY: -100,
+    });
+    const key = new KeyboardEvent("keydown", {
+      bubbles: true,
+      cancelable: true,
+      key: "+",
+    });
+    input.dispatchEvent(wheel);
+    input.dispatchEvent(key);
+    expect(wheel.defaultPrevented).toBe(false);
+    expect(key.defaultPrevented).toBe(false);
+    expect(stage.style.transform).toBe(before);
+    view.destroy();
+  });
+
+  test("keeps node camera events from reaching document handlers twice", () => {
+    const { stage, viewport } = makeView(400, 200, 800, 400);
+    const node = makeNode(stage);
+    const onEscape = vi.fn(() => false);
+    const view = createDiagramView(viewport, stage, { onEscape });
+    const onKey = vi.fn();
+    document.addEventListener("keydown", onKey);
+    node.dispatchEvent(
+      new KeyboardEvent("keydown", { bubbles: true, key: "+" }),
+    );
+    expect(onKey).toHaveBeenCalledOnce();
+    node.dispatchEvent(
+      new KeyboardEvent("keydown", { bubbles: true, key: "Escape" }),
+    );
+    expect(onEscape).toHaveBeenCalledOnce();
+    document.removeEventListener("keydown", onKey);
+    view.destroy();
+  });
+
+  test("preserves native controls wrapping a selectable node", () => {
+    const { stage, viewport } = makeView(400, 200, 800, 400);
+    const node = makeNode(stage);
+    const link = document.createElementNS("http://www.w3.org/2000/svg", "a");
+    link.setAttribute("href", "#target");
+    node.replaceWith(link);
+    link.append(node);
+    const view = createDiagramView(viewport, stage);
+    const wheel = new WheelEvent("wheel", {
+      bubbles: true,
+      cancelable: true,
+      ctrlKey: true,
+      deltaY: -100,
+    });
+    node.dispatchEvent(wheel);
+    node.dispatchEvent(
+      new KeyboardEvent("keydown", { bubbles: true, key: "+" }),
+    );
+    expect(wheel.defaultPrevented).toBe(false);
+    expect(view.getState().scale).toBe(0.5);
+    view.destroy();
+  });
+
   test("leaves ordinary wheel scrolling alone and handles modified wheel zoom", () => {
     const { stage, viewport } = makeView();
     const view = createDiagramView(viewport, stage);
@@ -338,6 +457,12 @@ describe("diagram view", () => {
     onScaleChange.mockClear();
     node.dispatchEvent(touch("pointermove", 30, 60));
     viewport.dispatchEvent(new KeyboardEvent("keydown", { key: "+" }));
+    node.dispatchEvent(
+      new KeyboardEvent("keydown", { bubbles: true, key: "+" }),
+    );
+    node.dispatchEvent(
+      new WheelEvent("wheel", { bubbles: true, ctrlKey: true, deltaY: -100 }),
+    );
     const click = touch("click", 30, 60);
     node.dispatchEvent(click);
 

@@ -4,7 +4,7 @@ Self-hosted viewer for Pi session Gists, with responsive navigation, message lin
 
 ## Usage
 
-Requires Pi (verified with `0.85.0`), [GitHub CLI](https://cli.github.com/) authenticated with Gist access, and an HTTPS deployment of this viewer.
+Requires Pi (export profiles tested for `0.85.0` and `1.5.2`), [GitHub CLI](https://cli.github.com/) authenticated with Gist access, and an HTTPS deployment of this viewer.
 
 Set the viewer URL before starting Pi, then run `/share`:
 
@@ -46,21 +46,19 @@ The pre-commit hook runs `./scripts/pre-commit.sh`. The script directly runs `bi
 
 Tests, type checks, and builds run separately in CI and the deployment workflow, not in the hook. `npm run check` runs read-only Biome checks across the build code, source, tests, and listed root configuration files. `npm ci` installs dependencies; the combined `npm run ci` script was removed.
 
-HTML entries are in `src/index.html` and `src/session/index.html`; static assets are in `public/`. Open `/session/#<gist-id>` to view a session locally. Production output is in `dist/`. E2E tests use a local Pi export and mocked GitHub requests, not real Gists. The test configuration passes `--ozone-platform=wayland` in WSL. Chromium is tested; Firefox and Safari are not.
+HTML entries are in `src/index.html` and `src/session/index.html`; static assets are in `public/`. Open `/session/#<gist-id>` to view a session locally. Production output is in `dist/`. E2E tests use a local Pi export and mocked GitHub requests, not real Gists. The test configuration passes `--ozone-platform=wayland` in WSL. Automated browser tests cover Chromium. Physical touch devices, screen readers, Firefox, and Safari remain unverified.
 
 Diagram camera behavior comes from `@narumitw/diagram-viewer/core`. This viewer still owns Mermaid rendering, the sandbox and resource limits, diagram controls, styling, and SVG/PNG exports. No remote renderer or package stylesheet is loaded.
 
-### Shared camera migration status
+Math parsing and session styling recognize the tested export profiles in `src/math-inject.ts`. The bundled library order and all four Markdown call sites must match before the viewer installs these enhancements. Unknown profiles keep Pi's original rendering and readable formula source. The hook preserves the current export's CJK emphasis handling.
 
-This migration is not ready for deployment because of the verification and license issues below. The dependency is now pinned to the published `@narumitw/diagram-viewer@0.2.0`, which includes the focusable-node touch and HTML-label readability fixes from [Morsel PR #171](https://github.com/narumiruna/morsel/pull/171). No sibling checkout or temporary tarball is required.
-
-The baseline full browser suite also has 35 existing math/session failures. Those gates have not been waived. Before distribution or deployment, the owner must resolve the license declarations: this project's `package.json` says MIT, its `LICENSE` contains AGPLv3, and the shared package declares `AGPL-3.0-only`. Real touch devices, screen readers, Firefox, and Safari remain unverified.
+The camera adapter keeps wheel and keyboard shortcuts available on the viewer's selectable SVG nodes, while leaving nested native controls alone. Camera calculations and gesture state remain in the shared package.
 
 ## Session controls
 
 - The session keeps Pi's original interaction model: **System Prompt** expands from its preview, **Available Tools** stays visible, and Pi's header, thinking, tool, search, branch, and navigation controls behave as they do on `pi.dev/session`.
 - The viewer applies a higher-contrast palette and more readable Markdown typography without replacing Pi's controls or changing which session content is visible.
-- Diagrams open fitted to the full **Overview**. Use **Use readable view** for legible label sizes; cropped diagrams remain reachable with arrow keys or fullscreen. Fullscreen supports one-finger pan and two-finger pan/zoom, while inline touch gestures continue to scroll the page. Additional source, copy, style, trace, reset, and export controls are under **More diagram actions**.
+- Diagrams open fitted to the full **Overview**. Use **Use readable view** for legible label sizes; cropped diagrams remain reachable with arrow keys or fullscreen. Fullscreen supports one-finger pan and two-finger pan/zoom, while inline touch gestures continue to scroll the page. Source, copy, reset, and export controls are directly available in the toolbar; style and tracing depend on the diagram type.
 - Formula source is available from the **Formula source** control. **Copy LaTeX** copies the original delimited expression. Wide display formulas show local scroll guidance and can be focused for keyboard scrolling.
 - The readable base session appears before optional Mermaid and KaTeX assets finish loading. If an optional asset fails, the source remains readable and **Retry enhancements** retries it without replacing the session frame or resetting the current view.
 
@@ -70,3 +68,7 @@ The baseline full browser suite also has 35 existing math/session failures. Thos
 - Mermaid and KaTeX assets are bundled; diagrams, math, and SVG/PNG exports use no rendering service.
 - Session downloads have no viewer-defined file-size or elapsed-time limit; GitHub's Gist and API behavior remains the upstream boundary. Fallback embed metadata discovery times out after ten seconds. Mermaid output is limited to 50 diagrams, with 100,000 source bytes and a five-second render deadline per diagram. Invalid diagrams or formulas retain their source.
 - No backend, OAuth, or Gist management is included. Delete shared content with `gh gist delete <gist-id>`.
+
+## License
+
+AGPL-3.0-only. See [LICENSE](LICENSE).

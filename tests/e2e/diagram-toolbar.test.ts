@@ -78,6 +78,10 @@ for (const width of [320, 640, 1440]) {
       ),
     ).toEqual([]);
 
+    // Trial clicks leave the pointer over the last control. Dismiss its hover
+    // tooltip with a neutral click before checking keyboard-focus behavior.
+    await card.locator(".pi-mermaid-stage").click({ position: { x: 1, y: 1 } });
+    await expect(frame.getByRole("tooltip")).toBeHidden();
     const copySource = toolbar.getByRole("button", { name: "Copy source" });
     await copySource.focus();
     const tooltip = frame.getByRole("tooltip");

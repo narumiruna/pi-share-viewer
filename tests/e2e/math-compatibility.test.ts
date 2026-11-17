@@ -1,13 +1,15 @@
 import { expect, test } from "@playwright/test";
 import {
   createExportFixture,
+  DARK_GIST_ID,
+  mockGist,
   readSessionData,
   replaceSessionText,
 } from "./session-fixture.js";
 
 // Exercise the unmodified upstream export, independently of our enhancer.
 // These assertions document why DOM-only math auto-render is insufficient.
-test("characterizes math source loss in the Pi 0.85.0 export", async ({
+test("characterizes math source loss in the installed Pi export", async ({
   page,
 }) => {
   const source = String.raw`Inline $x_i$ and $x_{i_j}$ and $a *b* c$.
@@ -46,6 +48,41 @@ Escaped \$5 and money $5 and $10.
   await expect(markdown.locator("br")).not.toHaveCount(0);
   await expect(markdown.locator("pre > code")).toHaveCount(2);
   expect(await markdown.textContent()).not.toContain(String.raw`a &= b \\`);
+});
+
+test("enhances the installed export without changing Pi's CJK emphasis", async ({
+  page,
+}) => {
+  const html = replaceSessionText(
+    await createExportFixture(),
+    "A normal Markdown paragraph.",
+    "日本語**「強調」**です。\n\nFormula $x_i$.",
+  );
+  await page.setContent(html);
+  const upstreamParagraph = page
+    .locator("#entry-a1b2c3d4 > .markdown-content > p")
+    .first();
+  await expect(upstreamParagraph.locator("strong")).toHaveText("「強調」");
+  const upstreamMarkup = await upstreamParagraph.innerHTML();
+
+  await mockGist(page, html);
+  await page.goto(`/session/#${DARK_GIST_ID}`);
+  const frame = page.frameLocator("#preview");
+  await expect(frame.locator('meta[name="pi-math-compat"]')).toHaveAttribute(
+    "content",
+    "1.5.2",
+  );
+  await expect(frame.locator("html")).toHaveAttribute(
+    "data-pi-session-skin",
+    "radix",
+  );
+  await expect(frame.locator(".pi-math math annotation")).toHaveText("x_i");
+  expect(
+    await frame
+      .locator("#entry-a1b2c3d4 > .markdown-content > p")
+      .first()
+      .innerHTML(),
+  ).toBe(upstreamMarkup);
 });
 
 test("characterizes the timing and scope of the upstream Markdown seam", async ({

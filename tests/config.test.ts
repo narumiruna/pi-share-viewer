@@ -43,6 +43,21 @@ describe("repository shape", () => {
     });
   });
 
+  test("keeps project license metadata consistent with the AGPL license", () => {
+    const manifest = JSON.parse(readFileSync("package.json", "utf8")) as {
+      license: string;
+    };
+    const lockfile = JSON.parse(readFileSync("package-lock.json", "utf8")) as {
+      packages: Record<string, { license?: string }>;
+    };
+
+    expect(manifest.license).toBe("AGPL-3.0-only");
+    expect(lockfile.packages[""].license).toBe(manifest.license);
+    expect(readFileSync("LICENSE", "utf8")).toContain(
+      "GNU AFFERO GENERAL PUBLIC LICENSE",
+    );
+  });
+
   test("honors the brace-expansion override inside Pi's shrinkwrapped tree", () => {
     const packageJson = JSON.parse(readFileSync("package.json", "utf8")) as {
       overrides: Record<string, Record<string, string>>;

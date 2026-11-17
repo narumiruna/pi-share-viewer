@@ -4,7 +4,7 @@
   "description": "Self-hosted Pi session viewer with interactive Mermaid diagrams",
   "private": true,
   "type": "module",
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/narumiruna/pi-share-viewer.git"

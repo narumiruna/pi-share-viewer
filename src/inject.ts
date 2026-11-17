@@ -1,5 +1,5 @@
 import { escapeInlineScript } from "./inline-script.js";
-import { PI_EXPORT_VERSION, prepareMathHook } from "./math-inject.js";
+import { prepareMathHook } from "./math-inject.js";
 import { isDiagramId, isGistId } from "./session-identifiers.js";
 import type { SiteTheme } from "./theme.js";
 
@@ -84,9 +84,9 @@ export function injectSessionViewer(
   const identity = metadata("pi-load-id", loadId);
   const viewerTheme = metadata("pi-viewer-theme", theme ?? "");
 
-  const mathApplication = prepareMathHook(document);
-  const compatibility = mathApplication
-    ? metadata("pi-math-compat", PI_EXPORT_VERSION)
+  const mathHook = prepareMathHook(document);
+  const compatibility = mathHook
+    ? metadata("pi-math-compat", mathHook.version)
     : undefined;
 
   const runtime = document.createElement("script");
@@ -102,7 +102,7 @@ export function injectSessionViewer(
     viewerTheme,
     ...(compatibility ? [compatibility] : []),
   );
-  if (mathApplication) mathApplication.before(runtime);
+  if (mathHook) mathHook.application.before(runtime);
   else document.body.append(runtime);
   return `<!doctype html>\n${document.documentElement.outerHTML}`;
 }

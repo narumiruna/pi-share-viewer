@@ -17,7 +17,7 @@ export function loadGistEmbedMetadata(
     const frame = document.createElement("iframe");
     frame.hidden = true;
     frame.setAttribute("sandbox", "allow-scripts");
-    frame.srcdoc = `<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https://gist.github.com; base-uri 'none'; form-action 'none'"><script>
+    const html = `<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https://gist.github.com; base-uri 'none'; form-action 'none'"><script>
       function piGistMetadata(data) {
         parent.postMessage({type: "pi-gist-metadata", owner: data.owner, files: data.files}, "*");
       }
@@ -25,11 +25,15 @@ export function loadGistEmbedMetadata(
         parent.postMessage({type: "pi-gist-metadata-failed"}, "*");
       }
     </script><script src="https://gist.github.com/${gistId}.json?callback=piGistMetadata" onerror="piGistFailed()"></script>`;
+    // Establish the isolated frame by navigation before its JSONP script loads.
+    const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
+    frame.src = url;
     const cleanup = () => {
       window.clearTimeout(timer);
       window.removeEventListener("message", onMessage);
       signal?.removeEventListener("abort", onAbort);
       frame.remove();
+      URL.revokeObjectURL(url);
     };
     const fail = (error: unknown) => {
       cleanup();
