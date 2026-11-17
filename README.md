@@ -48,6 +48,8 @@ Tests, type checks, and builds run separately in CI and the deployment workflow,
 
 HTML entries are in `src/index.html` and `src/session/index.html`; static assets are in `public/`. Open `/session/#<gist-id>` to view a session locally. Production output is in `dist/`. E2E tests use a local Pi export and mocked GitHub requests, not real Gists. The test configuration passes `--ozone-platform=wayland` in WSL. Automated browser tests cover Chromium. Physical touch devices, screen readers, Firefox, and Safari remain unverified.
 
+Optional acceptance review belongs to the project owner or tester: use the browser-test results and local captures to check those environments when needed. Record findings before claiming support; this review is not a prerequisite for the automated coding checks.
+
 Diagram camera behavior comes from `@narumitw/diagram-viewer/core`. This viewer still owns Mermaid rendering, the sandbox and resource limits, diagram controls, styling, and SVG/PNG exports. No remote renderer or package stylesheet is loaded.
 
 Math parsing and session styling recognize the tested export profiles in `src/math-inject.ts`. The bundled library order and all four Markdown call sites must match before the viewer installs these enhancements. Unknown profiles keep Pi's original rendering and readable formula source. The hook preserves the current export's CJK emphasis handling.
