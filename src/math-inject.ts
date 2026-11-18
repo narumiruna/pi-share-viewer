@@ -1,7 +1,23 @@
-export const PI_EXPORT_VERSION = "0.85.0";
+export const PI_EXPORT_VERSIONS = ["0.85.0", "1.5.2"] as const;
 
-// This is a compatibility seam, not a JavaScript rewriter. All four exact
-// Pi 0.85.0 call sites and the parser definition must match before any change.
+// This is a compatibility seam, not a JavaScript rewriter. A known library
+// sequence, all four exact call sites, and the parser must match before edits.
+const LIBRARY_PROFILES = [
+  { version: PI_EXPORT_VERSIONS[0], libraries: ["marked v18.0.5", "hljs"] },
+  {
+    version: PI_EXPORT_VERSIONS[1],
+    libraries: [
+      "marked v18.0.11 - a markdown parser",
+      "marked-cjk-friendly v0.1.2\n",
+      "Highlight.js v11.9.0 (git: f47103d4f1)",
+    ],
+  },
+];
+
+interface MathHook {
+  application: HTMLScriptElement;
+  version: (typeof PI_EXPORT_VERSIONS)[number];
+}
 const ARGUMENTS = [
   "skillBlock.content",
   "skillBlock.userMessage",
@@ -11,7 +27,7 @@ const ARGUMENTS = [
 const PARSER =
   "function safeMarkedParse(text) {\n        return marked.parse(text);\n      }";
 
-export function prepareMathHook(root: Document): HTMLScriptElement | undefined {
+export function prepareMathHook(root: Document): MathHook | undefined {
   const scripts = [...root.body.querySelectorAll<HTMLScriptElement>("script")];
   const applications = scripts.filter((script) =>
     script.textContent?.includes("function safeMarkedParse("),
@@ -19,15 +35,17 @@ export function prepareMathHook(root: Document): HTMLScriptElement | undefined {
   if (applications.length !== 1) return;
   const application = applications[0];
   const index = scripts.indexOf(application);
-  if (
-    application.attributes.length !== 0 ||
-    index < 2 ||
-    scripts[index - 2].attributes.length !== 0 ||
-    scripts[index - 1].attributes.length !== 0 ||
-    !scripts[index - 2].textContent?.includes("marked v18.0.5") ||
-    !scripts[index - 1].textContent?.includes("hljs")
-  )
-    return;
+  if (application.attributes.length !== 0) return;
+  const profile = LIBRARY_PROFILES.find(({ libraries }) =>
+    libraries.every((banner, offset) => {
+      const library = scripts[index - libraries.length + offset];
+      return (
+        library?.attributes.length === 0 &&
+        library.textContent?.includes(banner)
+      );
+    }),
+  );
+  if (!profile) return;
   let source = application.textContent ?? "";
   if (source.split(PARSER).length !== 2) return;
   const calls = ARGUMENTS.map((argument) => `\${safeMarkedParse(${argument})}`);
@@ -39,5 +57,5 @@ export function prepareMathHook(root: Document): HTMLScriptElement | undefined {
     );
   }
   application.textContent = source;
-  return application;
+  return { application, version: profile.version };
 }

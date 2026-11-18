@@ -19,7 +19,10 @@ describe("repository shape", () => {
 
     expect(packageJson.name).toBe("@narumiruna/pi-share-viewer");
     expect(packageJson.private).toBe(true);
-    expect(packageJson.engines?.node).toBe(">=22.22.2");
+    expect(packageJson.engines).toEqual({
+      node: "^24.15.0 || >=26.0.0",
+      npm: ">=11.0.0",
+    });
     expect(packageJson.pi).toBeUndefined();
     expect(
       packageJson.peerDependencies?.["@earendil-works/pi-coding-agent"],
@@ -28,6 +31,7 @@ describe("repository shape", () => {
     expect(existsSync("src/extension")).toBe(false);
     expect(packageJson.scripts?.build).toContain("build:bootstrap");
     expect(packageJson.dependencies).toMatchObject({
+      "@narumitw/diagram-viewer": expect.stringMatching(/^\d+\.\d+\.\d+$/),
       "@radix-ui/colors": expect.any(String),
       "@radix-ui/react-icons": expect.any(String),
       "@radix-ui/react-toolbar": expect.any(String),
@@ -37,6 +41,21 @@ describe("repository shape", () => {
       react: expect.any(String),
       "react-dom": expect.any(String),
     });
+  });
+
+  test("keeps project license metadata consistent with the AGPL license", () => {
+    const manifest = JSON.parse(readFileSync("package.json", "utf8")) as {
+      license: string;
+    };
+    const lockfile = JSON.parse(readFileSync("package-lock.json", "utf8")) as {
+      packages: Record<string, { license?: string }>;
+    };
+
+    expect(manifest.license).toBe("AGPL-3.0-only");
+    expect(lockfile.packages[""].license).toBe(manifest.license);
+    expect(readFileSync("LICENSE", "utf8")).toContain(
+      "GNU AFFERO GENERAL PUBLIC LICENSE",
+    );
   });
 
   test("honors the brace-expansion override inside Pi's shrinkwrapped tree", () => {

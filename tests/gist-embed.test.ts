@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { loadGistEmbedMetadata } from "../src/gist-embed.js";
 
 const GIST_ID = "2b736fe885c106e7ee125d52b1cfecbb";
@@ -11,7 +11,13 @@ function sendMetadata(
   window.dispatchEvent(new MessageEvent("message", { data, source }));
 }
 
+beforeEach(() => {
+  vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:gist-metadata");
+  vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+});
+
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.useRealTimers();
   document.body.replaceChildren();
 });
@@ -22,8 +28,13 @@ describe("isolated Gist embed metadata", () => {
     const frame = document.querySelector("iframe");
     expect(frame?.getAttribute("sandbox")).toBe("allow-scripts");
     expect(frame?.hidden).toBe(true);
-    expect(frame?.srcdoc).toContain("default-src 'none'");
-    expect(frame?.srcdoc).toContain(`${GIST_ID}.json?callback=piGistMetadata`);
+    expect(frame?.src).toBe("blob:gist-metadata");
+    expect(URL.createObjectURL).toHaveBeenCalledOnce();
+    const blob = vi.mocked(URL.createObjectURL).mock.calls[0][0] as Blob;
+    expect(blob.type).toBe("text/html");
+    const html = await blob.text();
+    expect(html).toContain("default-src 'none'");
+    expect(html).toContain(`${GIST_ID}.json?callback=piGistMetadata`);
     const metadata = {
       type: "pi-gist-metadata",
       owner: "owner",
@@ -37,6 +48,9 @@ describe("isolated Gist embed metadata", () => {
       files: ["session.html"],
     });
     expect(document.querySelector("iframe")).toBeNull();
+    expect(URL.revokeObjectURL).toHaveBeenCalledExactlyOnceWith(
+      "blob:gist-metadata",
+    );
   });
 
   test.each([
@@ -48,6 +62,9 @@ describe("isolated Gist embed metadata", () => {
     sendMetadata({ type: "pi-gist-metadata", ...metadata });
     await expect(result).rejects.toThrow("Invalid Gist embed metadata");
     expect(document.querySelector("iframe")).toBeNull();
+    expect(URL.revokeObjectURL).toHaveBeenCalledExactlyOnceWith(
+      "blob:gist-metadata",
+    );
   });
 
   test("cleans up on script failure, timeout, and cancellation", async () => {
@@ -55,6 +72,7 @@ describe("isolated Gist embed metadata", () => {
     sendMetadata({ type: "pi-gist-metadata-failed" });
     await expect(failed).rejects.toThrow("Unable to load");
     expect(document.querySelector("iframe")).toBeNull();
+    expect(URL.revokeObjectURL).toHaveBeenCalledTimes(1);
 
     vi.useFakeTimers();
     const timedOut = loadGistEmbedMetadata(GIST_ID);
@@ -62,6 +80,7 @@ describe("isolated Gist embed metadata", () => {
     await vi.advanceTimersByTimeAsync(10_000);
     await assertion;
     expect(document.querySelector("iframe")).toBeNull();
+    expect(URL.revokeObjectURL).toHaveBeenCalledTimes(2);
 
     const controller = new AbortController();
     const cancelled = loadGistEmbedMetadata(GIST_ID, controller.signal);
@@ -75,5 +94,7 @@ describe("isolated Gist embed metadata", () => {
       loadGistEmbedMetadata('"><script>unsafe</script>'),
     ).rejects.toThrow("Invalid Gist ID");
     expect(document.querySelector("iframe")).toBeNull();
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(3);
+    expect(URL.revokeObjectURL).toHaveBeenCalledTimes(3);
   });
 });

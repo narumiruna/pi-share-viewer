@@ -160,6 +160,9 @@ describe("decorateMermaidSvg", () => {
     decorateMermaidSvg(svg, "flowchart-v2");
     const cleanup = installDiagramFocus(svg);
     const node = svg.querySelector<SVGElement>("#render-flowchart-A-0");
+    expect(node?.hasAttribute("data-diagram-node")).toBe(true);
+    expect(node?.getAttribute("tabindex")).toBe("0");
+    expect(node?.getAttribute("role")).toBe("button");
     node?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
     expect(svg.classList.contains("pi-mermaid-focused")).toBe(true);

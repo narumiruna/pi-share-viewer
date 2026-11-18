@@ -1,4 +1,5 @@
 import { escapeInlineScript } from "./inline-script.js";
+import { PI_EXPORT_VERSIONS } from "./math-inject.js";
 import { createMathParser, type PiMarkdownParser } from "./math-source.js";
 import { isMermaidRendererReady } from "./mermaid-render-protocol.js";
 import {
@@ -14,9 +15,12 @@ const RENDERER_PROBE_TIMEOUT_MS = 5_000;
 const loadId =
   document.querySelector<HTMLMetaElement>('meta[name="pi-load-id"]')?.content ??
   "";
-const compatible =
-  document.querySelector<HTMLMetaElement>('meta[name="pi-math-compat"]')
-    ?.content === "0.85.0";
+const compatibilityVersion = document.querySelector<HTMLMetaElement>(
+  'meta[name="pi-math-compat"]',
+)?.content;
+const compatible = PI_EXPORT_VERSIONS.some(
+  (version) => version === compatibilityVersion,
+);
 const configuredTheme = document.querySelector<HTMLMetaElement>(
   'meta[name="pi-viewer-theme"]',
 )?.content;

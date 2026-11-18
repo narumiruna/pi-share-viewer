@@ -221,6 +221,7 @@ export function installDiagramFocus(svg: SVGSVGElement): () => void {
 
   for (const node of svg.querySelectorAll<SVGElement>("g.node[data-pi-tone]")) {
     node.tabIndex = 0;
+    node.dataset.diagramNode = "";
     node.setAttribute("role", "button");
     node.setAttribute(
       "aria-label",
