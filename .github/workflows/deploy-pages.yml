@@ -6,42 +6,54 @@ on:
     branches:
       - main
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+permissions: {}
 
 concurrency:
   group: pages
   cancel-in-progress: true
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  build:
+    name: Build the Pages site
     runs-on: ubuntu-latest
+    permissions:
+      contents: read # Check out the repository.
+      pages: read # Read the Pages site URL.
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 26
           cache: npm
       - name: Configure GitHub Pages
         id: pages
-        uses: actions/configure-pages@v6
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - run: npm ci
       - run: npm run check
       - run: npm test
       - run: npm run typecheck
       - name: Build for the Pages URL
         shell: bash
-        run: |
-          base_path="${{ steps.pages.outputs.base_path }}"
-          npm run build -- --base="${base_path%/}/"
-      - uses: actions/upload-pages-artifact@v5
+        env:
+          PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+        run: npm run build -- --base="${PAGES_BASE_PATH%/}/"
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: dist
+
+  deploy:
+    name: Publish the Pages site
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write # Publish the Pages artifact.
+      id-token: write # Verify the deployment source with OIDC.
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
